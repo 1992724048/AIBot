@@ -30,3 +30,12 @@
 *.exe
 *.out
 *.app
+
+.vs
+.vscode
+_ReSharper.Caches
+x64
+obj
+bin
+.idea
+windows
