@@ -147,11 +147,7 @@ class _ModelPageState extends State<ModelPage> with AutomaticKeepAliveClientMixi
   @override
   bool get wantKeepAlive => true;
   bool _readNote = false;
-  List<ModelItem> models = [
-    ModelItem("yolo11m", .openvino, "fp32"),
-    ModelItem("yolo12m", .openvino, "fp16"),
-    ModelItem("yolo26m", .openvino, "fp32"),
-  ];
+  List<ModelItem> models = [ModelItem("yolo11m", .openvino, "fp32"), ModelItem("yolo12m", .openvino, "fp16"), ModelItem("yolo26m", .openvino, "fp32")];
   int selectedModelIndex = 0;
   late String model = models.first.formatDisplayName();
   List<ClassItem> class_ids = [ClassItem("玩家", 0, false), ClassItem("头部", 1, true), ClassItem("躯体", 2, true)];
@@ -190,11 +186,7 @@ class _ModelPageState extends State<ModelPage> with AutomaticKeepAliveClientMixi
                           ),
                           icon: Icon(Icons.folder_zip),
                           style: TextButton.styleFrom(
-                            backgroundColor: Theme
-                                .of(context)
-                                .colorScheme
-                                .primaryContainer
-                                .withAlpha(100),
+                            backgroundColor: Theme.of(context).colorScheme.primaryContainer.withAlpha(100),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                           ),
                         ),
@@ -318,7 +310,9 @@ class _ModelPageState extends State<ModelPage> with AutomaticKeepAliveClientMixi
                 final modelItem = ModelItem.string2ModelItem(item);
                 return Row(
                   children: [
-                    Expanded(child: Text(modelItem.name)),
+                    Expanded(
+                      child: Baseline(baseline: 16, baselineType: TextBaseline.alphabetic, child: Text(modelItem.name)),
+                    ),
                     ModelTypeTag(type: modelItem.type),
                     VerticalDivider(thickness: 1),
                     ModelElementTag(element: modelItem.element),

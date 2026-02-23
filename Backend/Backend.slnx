@@ -9,7 +9,6 @@
   <Project Path="../../Library/OpenCV/OpenCV.vcxitems" Id="ef413479-cbe0-4a14-b733-707eb60cf1f7" />
   <Project Path="../../Library/OpenVINO/OpenVINO.vcxitems" Id="567c0f58-f1d1-49ad-9967-b4a6623142c1" />
   <Project Path="../../Library/parallel_hashmap/parallel_hashmap.vcxitems" Id="fb975bce-5eab-4257-92f9-8a19bf995845" />
-  <Project Path="../../Library/proxy/proxy.vcxitems" Id="6bde166c-e595-4141-9578-c7d2ac599234" />
   <Project Path="../../Library/stdpp/stdpp.vcxitems" Id="83123dd2-7a7e-496b-9b5d-e426d0ee48e3" />
   <Project Path="../../Library/toml11/toml11.vcxitems" Id="52546c69-9f00-46c5-8706-9d6a152876ee" />
   <Project Path="../../Library/zlib/zlib.vcxitems" Id="a19772eb-042d-4a04-a0d7-ab2fe8094a6f" />

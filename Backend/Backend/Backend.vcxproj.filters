@@ -15,8 +15,46 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Backend.cpp">
+    <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="module\screenshot\screenshot.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="page\preveiw\preveiw.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="module\openvino\openvino.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="module\ModelBackend.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="page\model\model.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="page\backend\backend.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="module\screenshot\screenshot.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="page\preveiw\preveiw.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="module\openvino\openvino.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="module\ModelBackend.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="page\model\model.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="page\backend\backend.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

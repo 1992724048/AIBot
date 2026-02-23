@@ -24,7 +24,7 @@ class AsyncDropdown extends StatefulWidget {
     required this.onChanged,
     this.value,
     this.defaultValue,
-    this.timeout = const Duration(seconds: 10),
+    this.timeout = const Duration(days: 1),
     this.onError,
     this.itemBuilder,
   });
@@ -127,9 +127,7 @@ class _AsyncDropdownState extends State<AsyncDropdown> {
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(showCloseIcon: true, duration: const Duration(seconds: 2), content: Text('操作失败: $error')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(showCloseIcon: true, duration: const Duration(seconds: 2), content: Text('操作失败: $error')));
       });
     }
   }
@@ -141,7 +139,8 @@ class _AsyncDropdownState extends State<AsyncDropdown> {
     final textTheme = theme.textTheme;
 
     Widget buildItem(String item) {
-      return widget.itemBuilder?.call(item) ?? Text(item);
+      final child = widget.itemBuilder?.call(item) ?? Text(item);
+      return Align(alignment: Alignment.centerLeft, child: child);
     }
 
     return Column(
@@ -172,7 +171,8 @@ class _AsyncDropdownState extends State<AsyncDropdown> {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: colorScheme.surface,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(6),
                       borderSide: BorderSide(color: colorScheme.outline),
@@ -190,9 +190,7 @@ class _AsyncDropdownState extends State<AsyncDropdown> {
                 if (_busy)
                   Positioned.fill(
                     child: IgnorePointer(
-                      child: Center(
-                        child: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                      ),
+                      child: Center(child: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))),
                     ),
                   ),
               ],

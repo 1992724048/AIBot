@@ -24,7 +24,7 @@ flutter:
   fonts:
     - family: zh
       fonts:
-        - asset: fonts/zh-cn.ttf
+        - asset: fonts/HarmonyOS_Sans_SC_Regular.ttf
           weight: 900
   assets:
     - images/

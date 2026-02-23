@@ -1,10 +1,13 @@
-﻿import 'dart:math' as math;
+﻿import 'dart:async';
+import 'dart:math' as math;
+import 'dart:math';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:ui/ffi.dart';
 import 'package:ui/widget/AlertBlock.dart';
-import 'package:ui/widget/AsyncButton.dart';
 import 'package:ui/widget/AsyncDropdown.dart';
 import 'package:ui/widget/AsyncInputChip.dart';
 import 'package:ui/widget/AsyncStringInput.dart';
@@ -19,16 +22,73 @@ class PreviewPage extends StatefulWidget {
   _PreviewPageState createState() => _PreviewPageState();
 }
 
-class _PreviewPageState extends State<PreviewPage>
-    with AutomaticKeepAliveClientMixin {
+class _PreviewPageState extends State<PreviewPage> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  Rect _point = Rect.fromPoints(Offset(0, 0), Offset(640, 640));
-  int _fpsLimit = 30;
-  int _desktopIndex = 1;
-  String _windowName = '';
-  String _windowClass = '';
-  String _processName = '';
+  late final _fpsLimit = FloatField("fps_limit", 120.0);
+  late final _windowHeight = IntField("window_height", 640);
+  late final _windowWidth = IntField("window_width", 640);
+  late final _asyncCapture = BoolField("async_capture", true);
+  late final _realTime = BoolField("real_time", false);
+  late final _showDetect = BoolField("show_detect", false);
+  late final _showFPS = BoolField("show_fps", false);
+  late final _desktopName = StringField("desktop_name", '');
+  late final _windowName = StringField("window_name", '');
+  late final _windowClass = StringField("window_class", '');
+
+  bool _isMonitoring = false;
+  bool _isImageHandlerRegistered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _registerImageHandler();
+  }
+
+  void _registerImageHandler() {
+    if (_isImageHandlerRegistered) return;
+
+    'push_mat'.cpp.method((args) async {
+      if (!_isMonitoring || args == null || !args.containsKey('mat')) return null;
+
+      final matInfo = args['mat'] as Map<dynamic, dynamic>;
+      final width = matInfo['width'] as int;
+      final height = matInfo['height'] as int;
+      final format = matInfo['format'] as String;
+      final data = matInfo['data'] as List<int>;
+
+      try {
+        if (format == 'jpeg') {
+          final codec = await ui.instantiateImageCodec(Uint8List.fromList(data), targetWidth: width, targetHeight: height);
+          final frameInfo = await codec.getNextFrame();
+
+          if (mounted) {
+            _imageViewKey.currentState?.updateImage(frameInfo.image);
+          }
+        } else if (format == 'bgra') {
+          final image = await createImageFromBgra(Uint8List.fromList(data), width, height);
+
+          if (mounted) {
+            _imageViewKey.currentState?.updateImage(image);
+          }
+        }
+      } catch (e) {
+        debugPrint('图像解码失败: $e');
+      }
+
+      return null;
+    });
+
+    _isImageHandlerRegistered = true;
+  }
+
+  Future<ui.Image> createImageFromBgra(Uint8List data, int width, int height) async {
+    final completer = Completer<ui.Image>();
+    ui.decodeImageFromPixels(data, width, height, ui.PixelFormat.bgra8888, (image) => completer.complete(image));
+    return completer.future;
+  }
+
+  final GlobalKey<_ImageViewState> _imageViewKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -46,13 +106,8 @@ class _PreviewPageState extends State<PreviewPage>
             const double minCardWidth = 700;
             const double spacing = 10;
 
-            final int crossAxisCount = math.max(
-              1,
-              (constraints.maxWidth / (minCardWidth + spacing)).ceil(),
-            );
-            final double cardWidth =
-                (constraints.maxWidth - spacing * (crossAxisCount - 1)) /
-                crossAxisCount;
+            final int crossAxisCount = math.max(1, (constraints.maxWidth / (minCardWidth + spacing)).ceil());
+            final double cardWidth = (constraints.maxWidth - spacing * (crossAxisCount - 1)) / crossAxisCount;
 
             return MasonryGridView.count(
               physics: const NeverScrollableScrollPhysics(),
@@ -65,20 +120,18 @@ class _PreviewPageState extends State<PreviewPage>
                 return switch (index) {
                   0 => SizedBox(
                     width: cardWidth,
-                    child: _PreviewCard(colorScheme, textScheme),
+                    child: _PreviewCard(colorScheme, textScheme, _imageViewKey, _isMonitoring, (value) {
+                      setState(() {
+                        _isMonitoring = value;
+                        if (!value) {
+                          _imageViewKey.currentState?.clearImage();
+                        }
+                      });
+                    }),
                   ),
-                  1 => SizedBox(
-                    width: cardWidth,
-                    child: _EditMatSizeCard(colorScheme, textScheme),
-                  ),
-                  2 => SizedBox(
-                    width: cardWidth,
-                    child: _EditMatPluginCard(colorScheme, textScheme),
-                  ),
-                  3 => SizedBox(
-                    width: cardWidth,
-                    child: _EditPluginParam(colorScheme, textScheme),
-                  ),
+                  1 => SizedBox(width: cardWidth, child: _EditMatSizeCard(colorScheme, textScheme)),
+                  2 => SizedBox(width: cardWidth, child: _EditMatPluginCard(colorScheme, textScheme)),
+                  3 => SizedBox(width: cardWidth, child: _EditPluginParam(colorScheme, textScheme)),
                   _ => const SizedBox(),
                 };
               },
@@ -89,7 +142,7 @@ class _PreviewPageState extends State<PreviewPage>
     );
   }
 
-  Widget _PreviewCard(ColorScheme colorScheme, TextTheme textTheme) {
+  Widget _PreviewCard(ColorScheme colorScheme, TextTheme textTheme, GlobalKey<_ImageViewState> imageViewKey, bool isMonitoring, ValueChanged<bool> onMonitoringChanged) {
     return CustomCard(
       elevation: 2,
       color: colorScheme.surfaceContainer,
@@ -104,13 +157,7 @@ class _PreviewPageState extends State<PreviewPage>
                 height: MediaQuery.of(context).size.height * 0.5,
                 color: Colors.black,
                 alignment: Alignment.center,
-                child: AspectRatio(
-                  aspectRatio: 16 / 10,
-                  child: Image.network(
-                    'https://api.elaina.cat/random/pc',
-                    fit: BoxFit.cover,
-                  ),
-                ),
+                child: ImageView(key: imageViewKey, isMonitoring: isMonitoring),
               ),
             ),
             Divider(thickness: 1),
@@ -125,27 +172,17 @@ class _PreviewPageState extends State<PreviewPage>
                   children: [
                     AsyncInputChip(
                       avatar: Icon(Icons.flash_on, size: 18),
-                      tooltip: "尽可能的显示更多画面\n最大限值: 60 FPS\n*性能开销: 高",
+                      tooltip: "尽可能的显示更多画面\n最大限值: 60 FPS\n*性能开销: 极高",
                       label: Baseline(
                         baseline: 14,
                         baselineType: TextBaseline.alphabetic,
-                        child: Text(
-                          '实时画面',
-                          style: TextStyle(fontSize: 14, height: 1.0),
-                        ),
+                        child: Text('实时画面', style: TextStyle(fontSize: 14, height: 1.0)),
                       ),
                       selected: () async {
-                        return await FFI.invoke(
-                              "get_previewPage_field",
-                              params: {'field': 'realTime'},
-                            )
-                            as bool;
+                        return await _realTime.get();
                       },
                       onSelected: (val) async {
-                        await FFI.invoke(
-                          "set_previewPage_field",
-                          params: {'field': 'realTime', 'value': val},
-                        );
+                        await _realTime.set(val);
                         setState(() {});
                         return true;
                       },
@@ -153,27 +190,17 @@ class _PreviewPageState extends State<PreviewPage>
                     const SizedBox(width: 8),
                     AsyncInputChip(
                       avatar: Icon(Icons.lightbulb, size: 18),
-                      tooltip: "在画面中标注出推理结果\n*性能开销: 中",
+                      tooltip: "在画面中标注出推理结果\n*性能开销: 高",
                       label: Baseline(
                         baseline: 14,
                         baselineType: TextBaseline.alphabetic,
-                        child: Text(
-                          '推理结果',
-                          style: TextStyle(fontSize: 14, height: 1.0),
-                        ),
+                        child: Text('推理结果', style: TextStyle(fontSize: 14, height: 1.0)),
                       ),
                       selected: () async {
-                        return await FFI.invoke(
-                              "get_previewPage_field",
-                              params: {'field': 'showDetect'},
-                            )
-                            as bool;
+                        return await _showDetect.get();
                       },
                       onSelected: (val) async {
-                        await FFI.invoke(
-                          "set_previewPage_field",
-                          params: {'field': 'showDetect', 'value': val},
-                        );
+                        await _showDetect.set(val);
                         setState(() {});
                         return true;
                       },
@@ -181,34 +208,30 @@ class _PreviewPageState extends State<PreviewPage>
                     const SizedBox(width: 8),
                     AsyncInputChip(
                       avatar: Icon(Icons.speed, size: 18),
-                      tooltip: "在画面左上角显示推理FPS与耗时\n*性能开销: 低",
+                      tooltip: "在画面左上角显示推理FPS与耗时\n*性能开销: 高",
                       label: Baseline(
                         baseline: 14,
                         baselineType: TextBaseline.alphabetic,
-                        child: Text(
-                          'FPS',
-                          style: TextStyle(fontSize: 14, height: 1.0),
-                        ),
+                        child: Text('FPS', style: TextStyle(fontSize: 14, height: 1.0)),
                       ),
                       selected: () async {
-                        return await FFI.invoke(
-                              "get_previewPage_field",
-                              params: {'field': 'showFPS'},
-                            )
-                            as bool;
+                        return await _showFPS.get();
                       },
                       onSelected: (val) async {
-                        await FFI.invoke(
-                          "set_previewPage_field",
-                          params: {'field': 'showFPS', 'value': val},
-                        );
+                        await _showFPS.set(val);
                         setState(() {});
                         return true;
                       },
                     ),
                   ],
                 ),
-                PlayPauseButton(),
+                PlayPauseButton(
+                  onStateChanged: (isPlaying) {
+                    setState(() {
+                      _isMonitoring = isPlaying;
+                    });
+                  },
+                ),
               ],
             ),
           ],
@@ -218,61 +241,6 @@ class _PreviewPageState extends State<PreviewPage>
   }
 
   Widget _EditMatSizeCard(ColorScheme colorScheme, TextTheme textTheme) {
-    final wCtrl = TextEditingController(text: _point.width.toInt().toString());
-    final hCtrl = TextEditingController(text: _point.height.toInt().toString());
-    final xCtrl = TextEditingController(text: _point.left.toInt().toString());
-    final yCtrl = TextEditingController(text: _point.top.toInt().toString());
-
-    Future<bool> syncRect() async {
-      final xStr = xCtrl.text.trim();
-      final yStr = yCtrl.text.trim();
-      final wStr = wCtrl.text.trim();
-      final hStr = hCtrl.text.trim();
-
-      final x = int.tryParse(xStr);
-      final y = int.tryParse(yStr);
-      final w = int.tryParse(wStr);
-      final h = int.tryParse(hStr);
-
-      if (x == null || y == null || w == null || h == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            showCloseIcon: true,
-            duration: Duration(seconds: 2),
-            content: Text('请输入合法的整数坐标/尺寸'),
-          ),
-        );
-        return true;
-      }
-
-      setState(() {
-        _point = Rect.fromLTWH(
-          x.toDouble(),
-          y.toDouble(),
-          w.toDouble(),
-          h.toDouble(),
-        );
-      });
-
-      await FFI.invoke(
-        "set_previewPage_field",
-        params: {'field': 'x_offset', 'value': x},
-      );
-      await FFI.invoke(
-        "set_previewPage_field",
-        params: {'field': 'y_offset', 'value': y},
-      );
-      await FFI.invoke(
-        "set_previewPage_field",
-        params: {'field': 'width', 'value': w},
-      );
-      await FFI.invoke(
-        "set_previewPage_field",
-        params: {'field': 'height', 'value': h},
-      );
-      return true;
-    }
-
     return CustomCard(
       elevation: 2,
       borderRadius: 5,
@@ -293,78 +261,43 @@ class _PreviewPageState extends State<PreviewPage>
             children: [
               Expanded(
                 child: AsyncStringInput(
-                  controller: wCtrl,
+                  prefixIcon: Transform.rotate(angle: pi / 2, child: Icon(Icons.height)),
                   label: '宽 (px)',
                   initialValue: '640',
-                  value: FFI.invoke(
-                    "get_previewPage_field",
-                    params: {'field': 'width'},
-                  ),
+                  value: () async => await _windowWidth.get(),
+                  keyboardType: .number,
+                  onSave: (String v) async {
+                    await _windowWidth.set(int.parse(v));
+                    return true;
+                  },
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: AsyncStringInput(
-                  controller: hCtrl,
+                  prefixIcon: Icon(Icons.height),
                   label: '高 (px)',
                   initialValue: '640',
-                  value: FFI.invoke(
-                    "get_previewPage_field",
-                    params: {'field': 'height'},
-                  ),
+                  value: () async => await _windowHeight.get(),
+                  keyboardType: .number,
+                  onSave: (String v) async {
+                    await _windowHeight.set(int.parse(v));
+                    return true;
+                  },
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Row(
-              verticalDirection: .down,
-              mainAxisSize: .min,
-              crossAxisAlignment: .end,
-              children: [
-                AsyncButton(
-                  onPressed: () async {
-                    xCtrl.text = yCtrl.text = '0';
-                    wCtrl.text = hCtrl.text = "640";
-                    return await syncRect();
-                  },
-                  type: .text,
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.refresh, size: 18),
-                      SizedBox(width: 4),
-                      Text('重置'),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                AsyncButton(
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.save, size: 18),
-                      SizedBox(width: 4),
-                      Text('保存'),
-                    ],
-                  ),
-                  onPressed: () async => await syncRect(),
-                ),
-              ],
-            ),
           ),
           AnimatedSize(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOutCubic,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 150),
-              opacity: (_point.width == 0 || _point.height == 0) ? 1 : 0,
-              child: (_point.width == 0 || _point.height == 0)
+              opacity: (_windowWidth.value < 0 || _windowHeight.value < 0) ? 1 : 0,
+              child: (_windowWidth.value < 0 || _windowHeight.value < 0)
                   ? Padding(
                       padding: EdgeInsets.only(top: 4),
-                      child: AlertBlock.warning(child: Text("捕获图像宽高大小不能为0")),
+                      child: AlertBlock.warning(child: Text("捕获图像宽高大小不小于0")),
                     )
                   : const SizedBox.shrink(),
             ),
@@ -373,9 +306,6 @@ class _PreviewPageState extends State<PreviewPage>
       ),
     );
   }
-
-  List<String> plugins = ['桌面截图', '窗口截图', '交换链截图'];
-  String selectedPlugin = '桌面截图';
 
   Widget _EditMatPluginCard(ColorScheme colorScheme, TextTheme textTheme) {
     return CustomCard(
@@ -389,31 +319,7 @@ class _PreviewPageState extends State<PreviewPage>
       titleSpacing: 5,
       icon: Icons.screenshot_monitor,
       color: colorScheme.surfaceContainer,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 5),
-          AsyncDropdown(
-            label: '模式',
-            value: '桌面截图',
-            items: plugins,
-            onChanged: (v) async {
-              setState(() {
-                selectedPlugin = v;
-              });
-              return true;
-            },
-          ),
-          Divider(thickness: 1),
-          const SizedBox(height: 5),
-          if (selectedPlugin == '桌面截图')
-            _DesktopScreenshot()
-          else if (selectedPlugin == '窗口截图')
-            _WindowScreenshot()
-          else
-            _SwapchainScreenshot(),
-        ],
-      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_DesktopScreenshot(), SizedBox(height: 8), _WindowScreenshot()]),
     );
   }
 
@@ -435,47 +341,28 @@ class _PreviewPageState extends State<PreviewPage>
             initialValue: "30",
             prefixIcon: Icon(Icons.shutter_speed),
             keyboardType: TextInputType.number,
-            value: () async => await FFI.invoke(
-              "get_previewPage_field",
-              params: {'field': 'fps_limit'},
-            ),
+            value: () async => _fpsLimit.get(),
             onSave: (v) async {
-              final fps = int.tryParse(v);
-              if (fps != null) {
-                await FFI.invoke(
-                  "set_previewPage_field",
-                  params: {'field': 'fps_limit', 'value': fps},
-                );
-                _fpsLimit = fps;
+              final fps = float.tryParse(v);
+              if (fps != null && fps > 0) {
+                _fpsLimit.set(fps);
                 return true;
               }
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('请输入合法的整数值')));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入合法的整数值')));
               return false;
             },
           ),
           Divider(thickness: 1),
           AsyncSwitch(
             title: Text("异步捕获"),
-            subtitle: Text(
-              "使用独立线程进行屏幕捕获，但会增加一帧延迟和资源占用",
-              style: TextStyle(fontSize: 13),
-            ),
+            subtitle: Text("使用独立线程进行屏幕捕获，但会增加一帧延迟和资源占用", style: TextStyle(fontSize: 13)),
             borderRadius: BorderRadius.circular(5),
             onSelected: (v) async {
-              await FFI.invoke(
-                "set_previewPage_field",
-                params: {'field': 'async_capture', 'value': v},
-              );
+              await _asyncCapture.set(v);
               return true;
             },
             selected: () async {
-              return await FFI.invoke(
-                    "get_previewPage_field",
-                    params: {'field': 'async_capture'},
-                  )
-                  as bool;
+              return await _asyncCapture.get();
             },
           ),
           const SizedBox(height: 5),
@@ -485,8 +372,8 @@ class _PreviewPageState extends State<PreviewPage>
             curve: Curves.easeOutCubic,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 150),
-              opacity: _fpsLimit == 0 ? 1 : 0,
-              child: _fpsLimit == 0
+              opacity: _fpsLimit.value == 0.0 ? 1 : 0,
+              child: _fpsLimit.value == 0.0
                   ? Padding(
                       padding: EdgeInsets.only(top: 4),
                       child: AlertBlock.warning(child: Text("捕获帧数上限不能为0")),
@@ -500,33 +387,22 @@ class _PreviewPageState extends State<PreviewPage>
   }
 
   Widget _DesktopScreenshot() {
-    return AsyncStringInput(
+    return AsyncDropdown(
       label: "显示器标识",
-      initialValue: "1",
-      prefixIcon: Icon(Icons.shutter_speed),
-      keyboardType: TextInputType.number,
+      defaultValue: "",
       value: () async {
-        int v = await FFI.invoke(
-          "set_previewPage_field",
-          params: {'field': 'desktop_index'},
-        );
-        _desktopIndex = v;
-        return v;
+        return await _desktopName.get();
       },
-      onSave: (v) async {
-        final index = int.tryParse(v);
-        if (index != null) {
-          await FFI.invoke(
-            "set_previewPage_field",
-            params: {'field': 'desktop_index', 'value': index},
-          );
-          _desktopIndex = index;
-          return true;
+      items: () async {
+        final result = await "get_monitor".cpp.invoke();
+        if (result is List) {
+          return result.map((e) => e.toString()).toList();
         }
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('请输入合法的整数值')));
-        return false;
+        return <String>[];
+      },
+      onChanged: (String v) async {
+        await _desktopName.set(v);
+        return true;
       },
     );
   }
@@ -539,19 +415,10 @@ class _PreviewPageState extends State<PreviewPage>
           prefixIcon: Icon(Icons.title),
           keyboardType: TextInputType.text,
           value: () async {
-            String v = await FFI.invoke(
-              "get_previewPage_field",
-              params: {'field': 'windows_name'},
-            );
-            _windowName = v;
-            return v;
+            return await _windowName.get();
           },
           onSave: (v) async {
-            await FFI.invoke(
-              "set_previewPage_field",
-              params: {'field': 'windows_name', 'value': v},
-            );
-            _windowName = v;
+            await _windowName.set(v);
             return true;
           },
         ),
@@ -561,47 +428,10 @@ class _PreviewPageState extends State<PreviewPage>
           prefixIcon: Icon(Icons.tag),
           keyboardType: TextInputType.text,
           value: () async {
-            String v = await FFI.invoke(
-              "get_previewPage_field",
-              params: {'field': 'class_name'},
-            );
-            _windowName = v;
-            return v;
+            return await _windowClass.get();
           },
           onSave: (v) async {
-            await FFI.invoke(
-              "set_previewPage_field",
-              params: {'field': 'class_name', 'value': v},
-            );
-            _windowClass = v;
-            return true;
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _SwapchainScreenshot() {
-    return Column(
-      children: [
-        AsyncStringInput(
-          label: "进程名称",
-          prefixIcon: Icon(Icons.vaccines),
-          keyboardType: TextInputType.text,
-          value: () async {
-            String v = await FFI.invoke(
-              "get_previewPage_field",
-              params: {'field': 'process_name'},
-            );
-            _processName = v;
-            return v;
-          },
-          onSave: (v) async {
-            await FFI.invoke(
-              "set_previewPage_field",
-              params: {'field': 'process_name', 'value': v},
-            );
-            _processName = v;
+            await _windowClass.set(v);
             return true;
           },
         ),
@@ -610,17 +440,52 @@ class _PreviewPageState extends State<PreviewPage>
   }
 }
 
-final ValueNotifier<bool> isPlaying = ValueNotifier<bool>(false);
+class PlayPauseButton extends StatefulWidget {
+  final Function(bool)? onStateChanged;
 
-class PlayPauseButton extends StatelessWidget {
-  const PlayPauseButton({super.key});
+  const PlayPauseButton({super.key, this.onStateChanged});
+
+  @override
+  State<PlayPauseButton> createState() => _PlayPauseButtonState();
+}
+
+class _PlayPauseButtonState extends State<PlayPauseButton> {
+  final ValueNotifier<bool> _isPlaying = ValueNotifier<bool>(false);
+  bool _isLoading = false;
+
+  Future<void> _togglePlayPause() async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      if (_isPlaying.value) {
+        await 'stop_monitor'.cpp.invoke();
+        widget.onStateChanged?.call(false);
+        _isPlaying.value = false;
+      } else {
+        await 'start_monitor'.cpp.invoke();
+        _isPlaying.value = true;
+        widget.onStateChanged?.call(true);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('操作失败: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    var scheme = Theme.of(context).colorScheme;
+    final scheme = Theme.of(context).colorScheme;
+
     return ValueListenableBuilder<bool>(
-      valueListenable: isPlaying,
-      builder: (_, playing, __) {
+      valueListenable: _isPlaying,
+      builder: (context, playing, child) {
         return Material(
           type: MaterialType.button,
           color: scheme.primary,
@@ -630,30 +495,119 @@ class PlayPauseButton extends StatelessWidget {
             hoverColor: scheme.primaryContainer.withAlpha(100),
             focusColor: scheme.primaryContainer.withAlpha(100),
             highlightColor: scheme.primaryContainer.withAlpha(200),
-            onTap: () => isPlaying.value = !playing,
+            onTap: _isLoading ? null : _togglePlayPause,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
-                key: ValueKey<bool>(playing),
-                mainAxisSize: .min,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
-                    child: playing
-                        ? Icon(
-                            key: ValueKey("pause"),
-                            Icons.pause,
-                            color: scheme.onPrimary,
+                    child: _isLoading
+                        ? SizedBox(
+                            key: const ValueKey('loading'),
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary),
                           )
-                        : Icon(
-                            key: ValueKey("play_arrow"),
-                            Icons.play_arrow,
-                            color: scheme.onPrimary,
-                          ),
+                        : Icon(key: ValueKey(playing ? 'pause' : 'play_arrow'), playing ? Icons.pause : Icons.play_arrow, color: scheme.onPrimary),
                   ),
+                  const SizedBox(width: 8),
+                  Text(_isLoading ? '正在处理' : (playing ? '停止推理' : '开始推理'), style: TextStyle(color: scheme.onPrimary)),
                 ],
               ),
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _isPlaying.dispose();
+    super.dispose();
+  }
+}
+
+class ImageView extends StatefulWidget {
+  final bool isMonitoring;
+
+  const ImageView({super.key, required this.isMonitoring});
+
+  @override
+  State<ImageView> createState() => _ImageViewState();
+}
+
+class _ImageViewState extends State<ImageView> {
+  ui.Image? _currentImage;
+
+  void updateImage(ui.Image image) {
+    if (mounted) {
+      setState(() {
+        _currentImage = image;
+      });
+    }
+  }
+
+  void clearImage() {
+    if (mounted) {
+      setState(() {
+        _currentImage = null;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isMonitoring) {
+      return _buildPlaceholder();
+    }
+
+    if (_currentImage != null) {
+      return RawImage(image: _currentImage, fit: BoxFit.contain, width: double.infinity, height: double.infinity);
+    }
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 8),
+          Text('等待画面...', style: TextStyle(color: Colors.grey[400])),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Image.network(
+      'https://api.elaina.cat/random/pc',
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(value: loadingProgress.expectedTotalBytes != null ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes! : null),
+              const SizedBox(height: 8),
+              Text('加载网络图...', style: TextStyle(color: Colors.grey[400])),
+            ],
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.broken_image, size: 48, color: Colors.grey[600]),
+              const SizedBox(height: 8),
+              Text('图片加载失败', style: TextStyle(color: Colors.grey[600])),
+            ],
           ),
         );
       },

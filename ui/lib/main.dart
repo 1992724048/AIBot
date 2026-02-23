@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:ui/pages/AboutPage.dart';
@@ -9,6 +7,8 @@ import 'package:ui/pages/ModelPage.dart';
 import 'package:ui/pages/PreviewPage.dart';
 import 'package:ui/pages/SettingPage.dart';
 import 'package:window_manager/window_manager.dart';
+
+import 'ffi.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +27,7 @@ void main() {
     await windowManager.show();
     await windowManager.focus();
   });
-  
+
   runApp(const MainApp());
 }
 
@@ -193,9 +193,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
                 const SizedBox(width: 3),
                 IconButton(
-                  onPressed: () {
-                    windowManager.close();
-                    exit(0);
+                  onPressed: () async {
+                    bool shouldClose = await showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('确认关闭'),
+                        content: Text('确定要退出应用吗？'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('取消')),
+                          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('确定')),
+                        ],
+                      ),
+                    );
+
+                    if (shouldClose) {
+                      await FFI.invoke('stop_monitor');
+                      await windowManager.destroy();
+                    }
                   },
                   icon: Icon(Icons.close, size: 20),
                 ),
