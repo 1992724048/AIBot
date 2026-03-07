@@ -16,7 +16,7 @@ class AsyncDropdown extends AsyncWidget<String, AsyncDropdown> {
   const AsyncDropdown({
     super.key,
     this.label,
-    this.searchHint = "搜索 (正则)",
+    this.searchHint = "搜索 (支持正则表达式)",
     this.itemEndBuilder,
     this.itemBeginBuilder,
     this.itemBuilder,
@@ -286,9 +286,11 @@ class _AsyncDropdownState extends AsyncWidgetState<String, AsyncDropdown> with S
                       padding: const EdgeInsets.only(left: 8, right: 4),
                       child: SizedBox(height: 40, child: beginWidget),
                     ),
-              suffixIcon: SizedBox(
+              suffixIcon: Padding(
+                padding: const EdgeInsets.only(right: 8),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     if (decorationWidget != null)
                       Padding(
@@ -296,15 +298,18 @@ class _AsyncDropdownState extends AsyncWidgetState<String, AsyncDropdown> with S
                         child: SizedBox(height: 40, child: decorationWidget),
                       ),
                     busy
-                        ? SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 3, value: progress, valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary)),
+                        ? Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 3, value: progress, valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary)),
+                            ),
                           )
                         : AnimatedRotation(
                             turns: _overlay != null ? 0.5 : 0,
                             duration: const Duration(milliseconds: 120),
-                            child: SizedBox(height: 40, width: 40, child: const Icon(Icons.arrow_drop_down)),
+                            child: SizedBox(height: 40, width: 32, child: const Icon(Icons.arrow_drop_down)),
                           ),
                   ],
                 ),

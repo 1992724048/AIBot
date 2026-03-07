@@ -7,6 +7,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:ui/ffi.dart';
 import 'package:ui/widget/AsyncDropdown.dart';
 import 'package:ui/widget/AsyncInput.dart';
+import 'package:ui/widget/AsyncSwitch.dart';
 import 'package:ui/widget/CustomCard.dart';
 
 import '../widget/HotkeyRecordWidget.dart';
@@ -70,8 +71,10 @@ class MouseControl extends StatefulWidget {
 
 class _MouseControl extends State<MouseControl> {
   final keys = Int32ListField("ControlPage::keys", Int32List(0));
+  final device = StringField("ControlPage::device", 'Windows API');
+  final autoFire = BoolField("ControlPage::auto_fire", false);
 
-  static const icons = {'Windows API': Icon(Icons.desktop_windows), 'ESP32S3 HID (蓝牙)': Icon(Icons.bluetooth), 'ESP32S3 HID (USB)': Icon(Icons.usb)};
+  static const icons = {'Windows API': Icon(Icons.desktop_windows), 'ESP32S3 HID (BLE)': Icon(Icons.bluetooth)};
 
   @override
   Widget build(BuildContext context) {
@@ -94,8 +97,12 @@ class _MouseControl extends State<MouseControl> {
               .get(() async {
                 List<LogicalKeyboardKey> k = [];
                 final ks = await keys.get();
-                for (final key in ks) {
-                  k.add(vkToLogicalKeyboardKey(key)!);
+                for (int i = 0; i < ks.length; i++) {
+                  final key = ks[i];
+                  final mappedKey = vkToLogicalKeyboardKey(key);
+                  if (mappedKey != null) {
+                    k.add(mappedKey);
+                  }
                 }
                 return k;
               })
@@ -108,6 +115,8 @@ class _MouseControl extends State<MouseControl> {
                 return true;
               }),
           Divider(),
+          AsyncSwitch(title: Text('自动扳机'), subtitle: Text('准星在检测框内自动开火')).get(() async => await autoFire.get()).set((v) async => await autoFire.set(v)),
+          Divider(),
           AsyncDropdown(
                 label: "接口类型",
                 itemBeginBuilder: (String item) {
@@ -117,12 +126,25 @@ class _MouseControl extends State<MouseControl> {
                   );
                 },
               )
-              .get(() async => '')
+              .get(() async => await device.get())
               .set((v) async {
-                await Future.delayed(Duration(seconds: 2));
+                await device.set(v);
                 return true;
               })
-              .items(() async => ['Windows API', 'ESP32S3 HID (蓝牙)', 'ESP32S3 HID (USB)']),
+              .items(() async => ['Windows API', 'ESP32S3 HID (BLE)']),
+          ValueListenableBuilder(
+            valueListenable: device,
+            builder: (context, value, child) {
+              switch (value) {
+                case 'ESP32S3 HID (BLE)':
+                  return Column(children: [Divider(), ESP32S3BLE()]);
+                case 'Windows API':
+                  break;
+                default:
+              }
+              return const SizedBox.shrink();
+            },
+          ),
         ],
       ),
     );
@@ -137,7 +159,7 @@ class MoveAlgorithm extends StatefulWidget {
 }
 
 class _MoveAlgorithmState extends State<MoveAlgorithm> {
-  final speed = FloatField("ControlPage::speed", 0.5);
+  final speed = FloatField("ControlPage::speed", 1);
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +181,7 @@ class _MoveAlgorithmState extends State<MoveAlgorithm> {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入合法整数')));
               return false;
             }
-            if (v > 100 || v <= 0) {
+            if (v > 100 || v < 1) {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入[1, 100]的数值区间')));
               return false;
             }
@@ -169,5 +191,19 @@ class _MoveAlgorithmState extends State<MoveAlgorithm> {
         ],
       ),
     );
+  }
+}
+
+class ESP32S3BLE extends StatefulWidget {
+  const ESP32S3BLE({super.key});
+
+  @override
+  State<StatefulWidget> createState() => _ESP32S3BLEState();
+}
+
+class _ESP32S3BLEState extends State<ESP32S3BLE> {
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: []);
   }
 }

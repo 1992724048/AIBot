@@ -1,5 +1,5 @@
-﻿// 遂沫 screenshot.cpp
-// 2026-02-27 03:23:43
+// 遂沫 screenshot.cpp
+// 2026-03-07 21:23:57
 
 #include "screenshot.h"
 #include "page/preveiw/preveiw.h"
@@ -8,6 +8,8 @@
 #include <chrono>
 
 #include "module/ModelBackend.h"
+
+#include "page/control/control.h"
 
 #include "stdpp/thread.hpp"
 
@@ -66,11 +68,13 @@ auto Screenshot::start_monitor() -> void {
             if (future.valid()) {
                 future.wait();
 
-                if (ins->show_detect) {
-                    if (auto value = future.get()) {
-                        for (const auto& [id, box] : value.value()) {
+                auto model_page = ModelPage::instance();
+                auto control_page = ControlPage::instance();
+                if (auto vec = future.get()) {
+                    if (ins->show_detect) {
+                        for (const auto& [id, box] : vec.value()) {
                             rectangle(temp, box, cv::Scalar(0, 255, 0), 2);
-                            std::string label = std::format("ID:{}:{}", id, ModelPage::instance()->get_tag_name(id));
+                            std::string label = std::format("ID:{}:{}", id, model_page->get_tag_name(id));
 
                             int baseline = 0;
                             cv::Size text_size = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseline);
@@ -79,9 +83,63 @@ auto Screenshot::start_monitor() -> void {
                             putText(temp, label, {box.x, box.y - 5}, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 1);
                         }
                     }
-                }
 
-                ins->put_image(temp);
+                    ins->put_image(temp);
+
+                    cv::Point2i screen_center{target_width / 2, target_height / 2};
+                    if ((GetAsyncKeyState(control_page->key.load()) & 0x8000) != 0) {
+                        int lenght{std::numeric_limits<int>::max()};
+                        cv::Point2i move_point;
+                        for (auto& [id, box] : vec.value()) {
+                            if (!model_page->is_select(id)) {
+                                continue;
+                            }
+
+                            box.width /= 2;
+                            box.height /= 2;
+
+                            cv::Point2i target_center{box.x + box.width, box.y + box.height};
+
+                            if (int len = norm(screen_center - target_center); len < lenght) {
+                                move_point = target_center;
+                                lenght = len;
+                            }
+                        }
+
+                        if (lenght != std::numeric_limits<int>::max()) {
+                            auto _ = control_page->speed.read_lock();
+                            float speed = *control_page->speed / 100;
+                            cv::Point2i offset{move_point - screen_center};
+                            std::array<INPUT, 1> inputs;
+                            inputs[0].type = INPUT_MOUSE;
+                            inputs[0].mi.dwFlags = MOUSEEVENTF_MOVE;
+                            inputs[0].mi.dx = offset.x * speed;
+                            inputs[0].mi.dy = offset.y * speed;
+                            SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
+                        }
+                    }
+
+                    auto _ = control_page->auto_fire.read_lock();
+                    if (*control_page->auto_fire) {
+                        for (auto& [id, box] : vec.value()) {
+                            if (!model_page->is_select(id)) {
+                                continue;
+                            }
+
+                            if (screen_center.x >= box.x && screen_center.x <= box.x + box.width && screen_center.y >= box.y && screen_center.y <= box.y + box.height) {
+                                std::array<INPUT, 1> inputs;
+                                inputs[0].type = INPUT_MOUSE;
+                                inputs[0].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+                                SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
+                                std::this_thread::sleep_for(1ms);
+                                inputs[0].type = INPUT_MOUSE;
+                                inputs[0].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+                                SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
+                                break;
+                            }
+                        }
+                    }
+                }
             }
 
             future = pool.push(ModelBackendManager::infer, frame);

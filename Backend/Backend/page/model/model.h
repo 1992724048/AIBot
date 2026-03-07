@@ -1,4 +1,4 @@
-﻿// 遂沫 model.h
+// 遂沫 model.h
 // 2026-02-27 01:37:30
 
 #pragma once
@@ -33,6 +33,7 @@ namespace page {
         Field<std::map<std::string, std::map<int, bool>>> select_tag{"ModelPage::select_tag", {}};
 
         auto get_tag_name(int id) const -> std::string;
+        auto is_select(int id) const -> bool;
 
         auto singleton_init() -> void override;
     private:

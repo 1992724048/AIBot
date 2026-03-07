@@ -1,5 +1,5 @@
-﻿// 遂沫 control.h
-// 2026-03-02 22:30:33
+// 遂沫 control.h
+// 2026-03-07 18:40:41
 
 #pragma once
 
@@ -18,8 +18,12 @@ namespace page {
         ControlPage();
         ~ControlPage() override = default;
 
+        std::atomic_int key;
+
         Field<std::vector<int32_t>> keys{"ControlPage::keys", {VK_LSHIFT}};
-        Field<float> speed{"ControlPage::speed", 0.5};
+        Field<float> speed{"ControlPage::speed", 1};
+        Field<std::string> device{"ControlPage::device", "WindowsAPI"};
+        Field<bool> auto_fire{"ControlPage::auto_fire", false};
 
         auto singleton_init() -> void override;
     };

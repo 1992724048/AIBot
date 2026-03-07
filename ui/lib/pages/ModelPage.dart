@@ -78,6 +78,24 @@ class ModelCard extends StatefulWidget {
 class _ModelCardState extends State<ModelCard> {
   List<ModelItem> items = [];
 
+  static final icons = {
+    'yolo': ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: Image.asset("images/yolo.png", width: 28, height: 28, fit: BoxFit.cover),
+    ),
+  };
+
+  static Map<RegExp, String> get _regexMatchers => {RegExp(r'yolo.*', caseSensitive: false): 'yolo'};
+
+  static Widget getIcon(String item) {
+    for (var entry in _regexMatchers.entries) {
+      if (entry.key.hasMatch(item)) {
+        return icons[entry.value] ?? const Icon(Icons.question_mark);
+      }
+    }
+    return const Icon(Icons.question_mark);
+  }
+
   @override
   Widget build(BuildContext context) {
     return CustomCard(
@@ -97,6 +115,9 @@ class _ModelCardState extends State<ModelCard> {
           AsyncDropdown(
                 timeoutTime: Duration(days: 1),
                 label: "模型",
+                itemBeginBuilder: (String item) {
+                  return Row(mainAxisSize: MainAxisSize.min, children: [getIcon(item), const SizedBox(width: 3), const VerticalDivider(thickness: 2, indent: 8, endIndent: 8)]);
+                },
                 itemEndBuilder: (String item) {
                   final v = items.where((m) => m.name == item).toList();
                   final modelItem = v[0];
@@ -118,12 +139,14 @@ class _ModelCardState extends State<ModelCard> {
                   final backend = item['backend']?.toString() ?? '';
                   final tagMap = item['tag_map'] as Map;
                   final strArr = backend.split(':');
-
                   if (strArr.length == 2) {
                     items.add(ModelItem(name, ModelType.fromString(strArr[0]), strArr[1], tagMap.cast<int, String>()));
                   }
                 }
-
+                final v = await _modelName.get();
+                if (v.isEmpty) {
+                  await _modelName.set(listMap[0]['name']);
+                }
                 return items.map((e) => e.name).toList();
               })
               .get(() async {
@@ -138,7 +161,6 @@ class _ModelCardState extends State<ModelCard> {
                 if (item.isEmpty) {
                   return false;
                 }
-
                 await _modelName.set(v);
                 currentTagMap[v] = item.first.tagMap;
                 currentSelect[v] = (await "get_tag".cpp.invoke({"name": v}) as Map).cast<int, bool>();
@@ -181,7 +203,7 @@ class _ModelTagState extends State<ModelTag> {
             children: [
               AlertBlock.note(child: Text("选择需要检测的对象类别，未选择的类别将被忽略。")),
               SizedBox(height: 5),
-              if (value.isNotEmpty)
+              if (value.isNotEmpty && currentTagMap[value]!.isNotEmpty)
                 Column(
                   children: [
                     for (var i = 0; i < currentTagMap[value]!.length; i++)

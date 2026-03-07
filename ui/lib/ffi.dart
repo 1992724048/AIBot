@@ -168,6 +168,9 @@ abstract class Field<T> extends ChangeNotifier implements ValueListenable<T> {
   Future<T> get() async {
     try {
       final result = await FFI.invoke('get_$name');
+      if (result == null) {
+        return value;
+      }
       final converted = _fromDynamic(result);
       if (converted != null) {
         if (converted != _value) {
@@ -186,8 +189,8 @@ abstract class Field<T> extends ChangeNotifier implements ValueListenable<T> {
     }
   }
 
-  Future<void> set(T newValue) async {
-    if (_value == newValue) return;
+  Future<bool> set(T newValue) async {
+    if (_value == newValue) return true;
 
     final oldValue = _value;
 
@@ -205,6 +208,7 @@ abstract class Field<T> extends ChangeNotifier implements ValueListenable<T> {
       }
       throw FFIException('SET_ERROR', 'Failed to set field $name: ${e.toString()}');
     }
+    return true;
   }
 
   void updateValue(T newValue) {

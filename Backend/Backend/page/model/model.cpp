@@ -1,5 +1,5 @@
-﻿// 遂沫 model.cpp
-// 2026-03-03 18:23:08
+// 遂沫 model.cpp
+// 2026-03-07 20:14:31
 
 #include "model.h"
 #include "flutter_windows/DartFFI.h"
@@ -25,6 +25,10 @@ auto ModelPage::get_tag_name(const int id) const -> std::string {
         return ptr->tag_name[id];
     }
     return {};
+}
+
+auto ModelPage::is_select(const int id) const -> bool {
+    return select_tag->at(*model_name).at(id);
 }
 
 auto ModelPage::singleton_init() -> void {
