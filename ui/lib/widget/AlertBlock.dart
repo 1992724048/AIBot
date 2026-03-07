@@ -23,20 +23,15 @@ class AlertBlock extends StatelessWidget {
 
   const AlertBlock._({required this.type, required this.child, this.icon, this.color, this.title});
 
-  factory AlertBlock.note({required Widget child, IconData? icon, Color? color, String? title}) =>
-      AlertBlock._(type: AlertType.note, child: child, icon: icon, color: color, title: title);
+  factory AlertBlock.note({required Widget child, IconData? icon, Color? color, String? title}) => AlertBlock._(type: AlertType.note, child: child, icon: icon, color: color, title: title);
 
-  factory AlertBlock.tip({required Widget child, IconData? icon, Color? color, String? title}) =>
-      AlertBlock._(type: AlertType.tip, child: child, icon: icon, color: color, title: title);
+  factory AlertBlock.tip({required Widget child, IconData? icon, Color? color, String? title}) => AlertBlock._(type: AlertType.tip, child: child, icon: icon, color: color, title: title);
 
-  factory AlertBlock.important({required Widget child, IconData? icon, Color? color, String? title}) =>
-      AlertBlock._(type: AlertType.important, child: child, icon: icon, color: color, title: title);
+  factory AlertBlock.important({required Widget child, IconData? icon, Color? color, String? title}) => AlertBlock._(type: AlertType.important, child: child, icon: icon, color: color, title: title);
 
-  factory AlertBlock.warning({required Widget child, IconData? icon, Color? color, String? title}) =>
-      AlertBlock._(type: AlertType.warning, child: child, icon: icon, color: color, title: title);
+  factory AlertBlock.warning({required Widget child, IconData? icon, Color? color, String? title}) => AlertBlock._(type: AlertType.warning, child: child, icon: icon, color: color, title: title);
 
-  factory AlertBlock.caution({required Widget child, IconData? icon, Color? color, String? title}) =>
-      AlertBlock._(type: AlertType.caution, child: child, icon: icon, color: color, title: title);
+  factory AlertBlock.caution({required Widget child, IconData? icon, Color? color, String? title}) => AlertBlock._(type: AlertType.caution, child: child, icon: icon, color: color, title: title);
 
   @override
   Widget build(BuildContext context) {

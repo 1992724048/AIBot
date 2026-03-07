@@ -18,6 +18,8 @@ BackendPage::BackendPage() {
 auto BackendPage::singleton_init() -> void {
     Dart::field(backend_name);
     Dart::field(device_name);
+    Dart::field(nms);
+    Dart::field(confidence);
 
     backend_name.add_event([](const std::shared_ptr<FieldEntryBase>& field_entry_base, const Event event) {
         module::ModelBackendManager::select(*instance()->backend_name);
@@ -31,7 +33,7 @@ auto BackendPage::singleton_init() -> void {
         EncodableList list;
         for (auto& name : module::ModelBackendManager::get_backends()) {
             TLOG << name;
-            list.emplace_back(Value(name));
+            list.emplace_back(name);
         }
         method_result->success(Value(list));
     });
@@ -39,7 +41,7 @@ auto BackendPage::singleton_init() -> void {
     "get_devices"_dart.method([](DartFFI::ValueMapArgs& pairs, const DartFFI::Result& method_result) {
         ValueList list;
         for (auto& [type, device] : module::ModelBackendManager::get_devices()) {
-            list.push_back(Value(device));
+            list.emplace_back(device);
             TLOG << "(" << magic_enum::enum_name(type).data() << ") " << device;
         }
         method_result->success(Value(list));

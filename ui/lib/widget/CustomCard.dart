@@ -15,6 +15,9 @@ class CustomCard extends StatelessWidget {
   final Offset shadowOffset;
   final EdgeInsetsGeometry? margin;
   final EdgeInsetsGeometry padding;
+  final bool isExpanded;
+  final Duration animationDuration;
+  final Curve animationCurve;
 
   const CustomCard({
     super.key,
@@ -32,14 +35,16 @@ class CustomCard extends StatelessWidget {
     this.shadowOffset = const Offset(0, 4),
     this.margin = const EdgeInsets.all(4.0),
     this.padding = const EdgeInsets.all(10),
+    this.isExpanded = true,
+    this.animationDuration = const Duration(milliseconds: 300),
+    this.animationCurve = Curves.easeInOut,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final effectiveShadowColor =
-        shadowColor ?? (theme.brightness == Brightness.dark ? Colors.black : Colors.grey.shade400);
+    final effectiveShadowColor = shadowColor ?? (theme.brightness == Brightness.dark ? Colors.black : Colors.grey.shade400);
 
     final alpha = (shadowIntensity * 255).clamp(0, 255).toInt();
 
@@ -48,7 +53,9 @@ class CustomCard extends StatelessWidget {
       elevation: 0,
       color: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(borderRadius)),
-      child: Container(
+      child: AnimatedContainer(
+        duration: animationDuration,
+        curve: animationCurve,
         decoration: BoxDecoration(
           color: color ?? theme.colorScheme.surfaceContainer,
           borderRadius: BorderRadius.circular(borderRadius),
@@ -83,7 +90,7 @@ class CustomCard extends StatelessWidget {
                 else
                   title!,
               if (title != null) const Divider(thickness: 1),
-              child,
+              AnimatedSize(alignment: Alignment.topCenter, duration: animationDuration, curve: animationCurve, child: isExpanded ? child : const SizedBox.shrink()),
             ],
           ),
         ),

@@ -17,16 +17,16 @@ namespace page {
         PreviewPage();
         ~PreviewPage() override = default;
 
-        Field<float> fps_limit{"fps_limit", 120};
-        Field<int> window_height{"window_height", 640};
-        Field<int> window_width{"window_width", 640};
-        Field<bool> async_capture{"async_capture", true};
-        Field<bool> real_time{"real_time", true};
-        Field<bool> show_detect{"show_detect", true};
-        Field<bool> show_fps{"show_fps", true};
-        Field<std::string> desktop_name{"desktop_name", ""};
-        Field<std::string> window_name{"window_name", ""};
-        Field<std::string> window_class{"window_class", ""};
+        Field<float> fps_limit{"PreviewPage::fps_limit", 120};
+        Field<int> window_height{"PreviewPage::window_height", 640};
+        Field<int> window_width{"PreviewPage::window_width", 640};
+        Field<bool> async_capture{"PreviewPage::async_capture", true};
+        Field<bool> real_time{"PreviewPage::real_time", true};
+        Field<bool> show_detect{"PreviewPage::show_detect", true};
+        Field<bool> show_fps{"PreviewPage::show_fps", true};
+        Field<std::string> desktop_name{"PreviewPage::desktop_name", ""};
+        Field<std::string> window_name{"PreviewPage::window_name", ""};
+        Field<std::string> window_class{"PreviewPage::window_class", ""};
 
         auto put_image(const cv::Mat& frame) -> void;
         auto singleton_init() -> void override;

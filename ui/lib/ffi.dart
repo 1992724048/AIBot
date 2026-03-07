@@ -126,7 +126,7 @@ typedef EncodableMap = Map<String, dynamic>;
 
 typedef float = double;
 
-abstract class Field<T> extends ChangeNotifier {
+abstract class Field<T> extends ChangeNotifier implements ValueListenable<T> {
   final String name;
   T _value;
   bool _disposed = false;
@@ -216,6 +216,7 @@ abstract class Field<T> extends ChangeNotifier {
     }
   }
 
+  @override
   T get value => _value;
 
   Future<T> refresh() async {
@@ -318,19 +319,19 @@ abstract class Field<T> extends ChangeNotifier {
       }
 
       if (value is Uint8List) {
-        return value.toList();
+        return value;
       }
       if (value is Int32List) {
-        return value.toList();
+        return value;
       }
       if (value is Int64List) {
-        return value.toList();
+        return value;
       }
       if (value is Float32List) {
-        return value.toList();
+        return value;
       }
       if (value is Float64List) {
-        return value.toList();
+        return value;
       }
 
       if (value is List) {

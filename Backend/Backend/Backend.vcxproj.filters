@@ -36,6 +36,9 @@
     <ClCompile Include="page\backend\backend.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="page\control\control.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="module\screenshot\screenshot.h">
@@ -56,5 +59,21 @@
     <ClInclude Include="page\backend\backend.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Resource\resource.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="page\control\control.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Resource\icon.ico">
+      <Filter>资源文件</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resource\Resource.rc">
+      <Filter>资源文件</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

@@ -5,7 +5,6 @@ import 'package:ui/pages/BackendPage.dart';
 import 'package:ui/pages/ControlPage.dart';
 import 'package:ui/pages/ModelPage.dart';
 import 'package:ui/pages/PreviewPage.dart';
-import 'package:ui/pages/SettingPage.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'ffi.dart';
@@ -28,11 +27,13 @@ void main() {
     await windowManager.focus();
   });
 
-  runApp(const MainApp());
+  runApp(MainApp());
 }
 
 class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+  MainApp({super.key});
+
+  final _refreshNotifier = ValueNotifier<int>(0);
 
   ButtonStyle appElevatedButtonStyle(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -73,21 +74,26 @@ class MainApp extends StatelessWidget {
       outlinedButtonTheme: OutlinedButtonThemeData(style: outlinedButtonStyle),
     );
 
-    return DynamicColorBuilder(
-      builder: (lightDynamic, darkDynamic) {
-        Color systemColor = Colors.blue;
+    return ValueListenableBuilder<int>(
+      valueListenable: _refreshNotifier,
+      builder: (context, value, child) {
+        return DynamicColorBuilder(
+          builder: (lightDynamic, darkDynamic) {
+            Color systemColor = Colors.blue;
 
-        if (lightDynamic != null) {
-          systemColor = lightDynamic.primary;
-        }
+            if (lightDynamic != null) {
+              systemColor = lightDynamic.primary;
+            }
 
-        return MaterialApp(
-          themeMode: ThemeMode.system,
-          theme: buildTheme(Brightness.light, systemColor),
-          darkTheme: buildTheme(Brightness.dark, systemColor),
-          home: const HomePage(),
-          builder: (context, child) {
-            return AnimatedTheme(data: Theme.of(context), duration: const Duration(milliseconds: 10), curve: Curves.easeInOut, child: child!);
+            return MaterialApp(
+              themeMode: ThemeMode.system,
+              theme: buildTheme(Brightness.light, systemColor),
+              darkTheme: buildTheme(Brightness.dark, systemColor),
+              home: const HomePage(),
+              builder: (context, child) {
+                return AnimatedTheme(data: Theme.of(context), duration: const Duration(milliseconds: 10), curve: Curves.easeInOut, child: child!);
+              },
+            );
           },
         );
       },
@@ -100,7 +106,6 @@ const List<_NavItem> _navIcons = [
   _NavItem(Icons.assistant_outlined, Icons.assistant, "模型"),
   _NavItem(Icons.dashboard_customize_sharp, Icons.dashboard, "后端"),
   _NavItem(Icons.open_with_outlined, Icons.control_camera, "操作"),
-  _NavItem(Icons.settings_outlined, Icons.settings, "设置"),
   _NavItem(Icons.info_outlined, Icons.info, "关于"),
 ];
 
@@ -113,12 +118,10 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late final PageController _ctrl = PageController(initialPage: _navIcons.length - 1);
-  final List<Widget> _pages = const [PreviewPage(), ModelPage(), BackendPage(), ControlPage(), SettingPage(), AboutPage()];
+  final List<Widget> _pages = const [PreviewPage(), ModelPage(), BackendPage(), ControlPage(), AboutPage()];
 
-  int _page = _navIcons.length - 1;
   int _targetPage = _navIcons.length - 1;
-
-  bool always_top = false;
+  bool alwaysTop = false;
 
   @override
   void initState() {
@@ -155,7 +158,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
           Divider(thickness: 1, height: 1),
           Expanded(
-            child: PageView(controller: _ctrl, physics: const NeverScrollableScrollPhysics(), onPageChanged: (i) => setState(() => _page = i), children: _pages),
+            child: PageView(controller: _ctrl, physics: const NeverScrollableScrollPhysics(), onPageChanged: (i) => setState(() {}), children: _pages),
           ),
         ],
       ),
@@ -178,11 +181,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 IconButton(
                   onPressed: () {
                     setState(() {
-                      always_top = !always_top;
-                      windowManager.setAlwaysOnTop(always_top);
+                      alwaysTop = !alwaysTop;
+                      windowManager.setAlwaysOnTop(alwaysTop);
                     });
                   },
-                  icon: Icon(always_top ? Icons.push_pin : Icons.push_pin_outlined, size: 20),
+                  icon: Icon(alwaysTop ? Icons.push_pin : Icons.push_pin_outlined, size: 20),
                 ),
                 const SizedBox(width: 3),
                 IconButton(

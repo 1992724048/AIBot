@@ -1,11 +1,10 @@
-﻿import 'dart:io';
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:ui/widget/AlertBlock.dart';
 import 'package:ui/widget/AsyncDropdown.dart';
-import 'package:ui/widget/AsyncStringInput.dart';
+import 'package:ui/widget/AsyncInput.dart';
 import 'package:ui/widget/CustomCard.dart';
 import 'package:ui/widget/SmoothScrollView.dart';
 
@@ -68,15 +67,86 @@ class SelectBackend extends StatefulWidget {
 }
 
 class _SelectBackendState extends State<SelectBackend> {
-  static final _backendName = StringField('backend_name', '');
-  static final _deviceName = StringField('device_name', '');
+  static final _backendName = StringField('BackendPage::backend_name', '');
+  static final _deviceName = StringField('BackendPage::device_name', '');
+
+  static final icons = {
+    'OpenVINO': ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: Image.asset("images/intel.png", width: 28, height: 28, fit: BoxFit.cover),
+    ),
+  };
+  static final iconsDevice = {
+    'IntelCoreUltra': ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: Image.asset("images/core_ultra.webp", width: 28, height: 28, fit: BoxFit.cover),
+    ),
+    'IntelCore': ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: Image.asset("images/intel_core.webp", width: 28, height: 28, fit: BoxFit.cover),
+    ),
+    'IntelGraphics': ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: Image.asset("images/iris_xe.png", width: 28, height: 28, fit: BoxFit.cover),
+    ),
+    'IntelArc': ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: Image.asset("images/intel_arc.png", width: 28, height: 28, fit: BoxFit.cover),
+    ),
+    'IntelXeon': ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: Image.asset("images/xeon.webp", width: 28, height: 28, fit: BoxFit.cover),
+    ),
+    'IntelNPU': ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: Image.asset("images/npu.png", width: 28, height: 28, fit: BoxFit.cover),
+    ),
+    'NVIDIA': ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: Image.asset("images/nvidia.png", width: 28, height: 28, fit: BoxFit.cover),
+    ),
+    'AMD': ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: Image.asset("images/amd.png", width: 28, height: 28, fit: BoxFit.cover),
+    ),
+  };
+
+  static Map<RegExp, String> get _regexMatchers => {
+    RegExp(r'core.*ultra|ultra\s*\d+|core\s*ultra', caseSensitive: false): 'IntelCoreUltra',
+    RegExp(r'core(?![^u]*ultra)|core\s*i[3579]|intel.*core(?!.*ultra)', caseSensitive: false): 'IntelCore',
+    RegExp(r'iris|uhd|graphics|xe\s*graphics', caseSensitive: false): 'IntelGraphics',
+    RegExp(r'arc\s*a?\d+|intel.*arc', caseSensitive: false): 'IntelArc',
+    RegExp(r'xeon', caseSensitive: false): 'IntelXeon',
+    RegExp(r'npu|neural.*processing', caseSensitive: false): 'IntelNPU',
+    RegExp(r'nvidia|geforce|rtx|gtx|titan|quadro', caseSensitive: false): 'NVIDIA',
+    RegExp(r'amd|ryzen|radeon|threadripper|epyc', caseSensitive: false): 'AMD',
+  };
+
+  static Widget getDeviceIcon(String item) {
+    for (var entry in _regexMatchers.entries) {
+      if (entry.key.hasMatch(item)) {
+        return iconsDevice[entry.value] ?? const Icon(Icons.question_mark);
+      }
+    }
+    return const Icon(Icons.question_mark);
+  }
 
   @override
-  Future<void> initState() async {
+  void initState() {
     super.initState();
+    _backendName.addListener(_onBackendChanged);
+  }
 
-    final _ = await _backendName.get();
-    final _ = await _deviceName.get();
+  @override
+  void dispose() {
+    _backendName.removeListener(_onBackendChanged);
+    super.dispose();
+  }
+
+  void _onBackendChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -93,44 +163,57 @@ class _SelectBackendState extends State<SelectBackend> {
         child: Column(
           children: [
             AsyncDropdown(
-              label: '后端框架',
-              items: () async {
-                final result = await "get_backends".cpp.invoke();
-                if (result is List) {
-                  return result.cast<String>();
-                }
-                return <String>[];
-              },
-              onChanged: (value) async {
-                await _backendName.set(value);
-                return true;
-              },
-              value: () async => await _backendName.get(),
-            ),
-            AnimatedBuilder(
-              animation: _backendName,
-              builder: (context, child) {
-                if (_backendName.value.isEmpty) {
+                  timeoutTime: Duration(days: 1),
+                  label: '后端框架',
+                  itemBeginBuilder: (String item) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [icons[item] ?? const Icon(Icons.question_mark), const SizedBox(width: 3), const VerticalDivider(thickness: 2, indent: 8, endIndent: 8)],
+                    );
+                  },
+                )
+                .items(() async {
+                  final result = await "get_backends".cpp.invoke();
+                  if (result is List) {
+                    return result.cast<String>();
+                  }
+                  return <String>[];
+                })
+                .get(() async => await _backendName.get())
+                .set((value) async {
+                  await _backendName.set(value);
+                  await _deviceName.set('');
+                  return true;
+                }),
+            ValueListenableBuilder<String>(
+              valueListenable: _backendName,
+              builder: (context, backendValue, child) {
+                if (backendValue.isEmpty) {
                   return const SizedBox.shrink();
                 }
                 return Column(
                   children: [
                     const Divider(height: 16, thickness: 1),
                     AsyncDropdown(
-                      label: '设备名称',
-                      items: () async {
-                        final result = await "get_devices".cpp.invoke();
-                        if (result is List) {
-                          return result.cast<String>();
-                        }
-                        return <String>[];
-                      },
-                      onChanged: (value) async {
-                        await _deviceName.set(value);
-                        return true;
-                      },
-                      value: () async => await _deviceName.get(),
-                    ),
+                          label: '设备名称',
+                          key: ValueKey(backendValue),
+                          itemBeginBuilder: (String item) {
+                            return Row(mainAxisSize: MainAxisSize.min, children: [getDeviceIcon(item), const SizedBox(width: 3), const VerticalDivider(thickness: 2, indent: 8, endIndent: 8)]);
+                          },
+                        )
+                        .items(() async {
+                          final result = await "get_devices".cpp.invoke();
+                          if (result is List) {
+                            return result.cast<String>();
+                          }
+                          return <String>[];
+                        })
+                        .get(() async => await _deviceName.get())
+                        .set((value) async {
+                          await _deviceName.set(value);
+                          return true;
+                        })
+                        .timeout(Duration(minutes: 1)),
                   ],
                 );
               },
@@ -139,11 +222,6 @@ class _SelectBackendState extends State<SelectBackend> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 }
 
@@ -155,6 +233,9 @@ class ResultProcess extends StatefulWidget {
 }
 
 class _ResultProcessState extends State<ResultProcess> {
+  static final _nms = FloatField('BackendPage::nms', 0.5);
+  static final _confidence = FloatField('BackendPage::confidence', 0.5);
+
   @override
   Widget build(BuildContext context) {
     return CustomCard(
@@ -170,31 +251,25 @@ class _ResultProcessState extends State<ResultProcess> {
       child: Column(
         children: [
           AlertBlock.warning(child: Text("调整以下参数可能导致检测效果下降，请谨慎修改。")),
-          SizedBox(height: 14),
+          SizedBox(height: 8),
+          AlertBlock.note(child: Text("是否需要 NMS 由模型决定，部分模型不需要 NMS (如yolo26)")),
+          SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: AsyncStringInput(
-                  label: "置信度",
-                  value: "0.6",
-                  initialValue: "0.6",
-                  prefixIcon: Icon(Icons.fact_check),
-                  onSave: (String v) async {
-                    return true;
-                  },
-                ),
+                child: AsyncInput(label: "置信度", defaultValue: "0.6", prefixIcon: Icon(Icons.fact_check), keyboardType: .number).get(() async => (await _confidence.get()).toString()).set((
+                  String v,
+                ) async {
+                  await _confidence.set(double.parse(v));
+                  return true;
+                }),
               ),
               SizedBox(width: 12),
               Expanded(
-                child: AsyncStringInput(
-                  label: "NMS",
-                  value: "0.6",
-                  initialValue: "0.6",
-                  prefixIcon: Icon(Icons.all_out),
-                  onSave: (String v) async {
-                    return true;
-                  },
-                ),
+                child: AsyncInput(label: "NMS", defaultValue: "0.6", prefixIcon: Icon(Icons.all_out), keyboardType: .number).get(() async => (await _nms.get()).toString()).set((String v) async {
+                  await _nms.set(double.parse(v));
+                  return true;
+                }),
               ),
             ],
           ),

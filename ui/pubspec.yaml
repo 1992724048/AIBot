@@ -1,5 +1,5 @@
 name: ui
-description: "AI AimBot Tool"
+description: "AI Proxy"
 publish_to: 'none'
 version: 0.1.0
 
@@ -18,13 +18,14 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  freezed: ^3.2.5
 
 flutter:
   uses-material-design: true
   fonts:
     - family: zh
       fonts:
-        - asset: fonts/HarmonyOS_Sans_SC_Regular.ttf
+        - asset: fonts/zh-cn.ttf
           weight: 900
   assets:
     - images/

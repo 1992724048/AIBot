@@ -1,5 +1,5 @@
 ﻿// 遂沫 preveiw.cpp
-// 2026-02-23 17:52:49
+// 2026-03-01 18:53:19
 
 #include "preveiw.h"
 
@@ -17,7 +17,7 @@ PreviewPage::PreviewPage() {
 }
 
 auto PreviewPage::put_image(const cv::Mat& frame) -> void {
-    if (real_time) {
+    if (real_time && !frame.empty()) {
         cv::Mat clone = frame.clone();
         frame_count++;
         const auto now = std::chrono::steady_clock::now();
@@ -46,18 +46,18 @@ auto PreviewPage::put_image(const cv::Mat& frame) -> void {
             putText(clone, "FPS: " + std::to_string(static_cast<int>(current_fps)), cv::Point(x, y), cv::FONT_HERSHEY_SIMPLEX, font_scale, cv::Scalar(0, 255, 0), thickness);
         }
 
-        static std::vector compression_params = {cv::IMWRITE_JPEG_QUALITY, 80};
+        static std::vector compression_params = {cv::IMWRITE_JPEG_QUALITY, 100};
         std::vector<uint8_t> jpeg_data;
         imencode(".jpg", clone, jpeg_data, compression_params);
 
         EncodableMap image_info;
-        image_info[EncodableValue("width")] = EncodableValue(clone.cols);
-        image_info[EncodableValue("height")] = EncodableValue(clone.rows);
-        image_info[EncodableValue("format")] = EncodableValue("jpeg");
-        image_info[EncodableValue("data")] = EncodableValue(jpeg_data);
+        image_info[Value("width")] = Value(clone.cols);
+        image_info[Value("height")] = Value(clone.rows);
+        image_info[Value("format")] = Value("jpeg");
+        image_info[Value("data")] = Value(jpeg_data);
 
         DartFFI::ValueMapArgs args;
-        args["mat"] = EncodableValue(image_info);
+        args["mat"] = Value(image_info);
         try {
             "push_mat"_dart.invoke(args);
         } catch (const std::exception& exception) {
@@ -116,7 +116,7 @@ auto PreviewPage::singleton_init() -> void {
         EncodableList list;
         for (auto& monitor : Screenshot::get_monitor()) {
             TLOG << "显示器: " << monitor;
-            list.push_back(EncodableValue(monitor));
+            list.emplace_back(monitor);
         }
         method_result->success(EncodableValue(list));
     });

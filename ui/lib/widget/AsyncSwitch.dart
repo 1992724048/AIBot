@@ -1,17 +1,8 @@
-﻿import 'dart:async';
+﻿import 'package:flutter/material.dart';
 
-import 'package:flutter/material.dart';
+import 'AsyncWidget.dart';
 
-typedef AsyncSelectedSetter = Future<bool> Function(bool selected);
-typedef AsyncSelectedGetter = Future<bool> Function();
-typedef ErrorCallback = void Function(Object error, StackTrace? stack);
-
-class AsyncSwitch extends StatefulWidget {
-  final dynamic selected;
-  final bool defaultSelected;
-  final AsyncSelectedSetter onSelected;
-  final Duration timeout;
-  final ErrorCallback? onError;
+class AsyncSwitch extends AsyncWidget<bool, AsyncSwitch> {
   final Widget? title;
   final Widget? subtitle;
   final BorderRadius borderRadius;
@@ -19,11 +10,14 @@ class AsyncSwitch extends StatefulWidget {
 
   const AsyncSwitch({
     super.key,
-    required this.onSelected,
-    this.selected,
-    this.defaultSelected = false,
-    this.timeout = const Duration(seconds: 10),
-    this.onError,
+    super.defaultValue = false,
+    super.getter,
+    super.setter,
+    super.errorHandler,
+    super.timeoutTime,
+    super.showDefaultError,
+    super.progressNotifier,
+    super.readOnlyNotifier,
     this.title,
     this.subtitle,
     this.borderRadius = const BorderRadius.all(Radius.circular(5)),
@@ -31,144 +25,80 @@ class AsyncSwitch extends StatefulWidget {
   });
 
   @override
+  AsyncSwitch copyWith({
+    bool? defaultValue,
+    AsyncValueGetter<bool>? getter,
+    AsyncValueSetter<bool>? setter,
+    ErrorCallback? errorHandler,
+    Duration? timeout,
+    bool? showDefaultError,
+    AsyncDrawer<bool>? drawer,
+    AsyncItemsGetter<bool>? itemsGetter,
+    ValueNotifier<double>? progressNotifier,
+    ValueNotifier<bool>? readOnlyNotifier,
+  }) {
+    return AsyncSwitch(
+      key: key,
+      defaultValue: defaultValue ?? this.defaultValue,
+      getter: getter ?? this.getter,
+      setter: setter ?? this.setter,
+      errorHandler: errorHandler ?? this.errorHandler,
+      timeoutTime: timeout ?? this.timeoutTime,
+      showDefaultError: showDefaultError ?? this.showDefaultError,
+      progressNotifier: progressNotifier ?? this.progressNotifier,
+      readOnlyNotifier: readOnlyNotifier ?? this.readOnlyNotifier,
+      title: title,
+      subtitle: subtitle,
+      borderRadius: borderRadius,
+      enabled: enabled,
+    );
+  }
+
+  @override
   State<AsyncSwitch> createState() => _AsyncSwitchState();
 }
 
-class _AsyncSwitchState extends State<AsyncSwitch> {
-  late bool _selected;
-  bool _loading = false;
-  bool _initializing = true;
-
+class _AsyncSwitchState extends AsyncWidgetState<bool, AsyncSwitch> {
   @override
-  void initState() {
-    super.initState();
-    _selected = false;
-    _initSelected();
-  }
+  Widget buildContent(BuildContext context, bool? value, bool busy, double? progress, List<bool>? items) {
+    final selected = value ?? false;
 
-  @override
-  void didUpdateWidget(covariant AsyncSwitch oldWidget) {
-    super.didUpdateWidget(oldWidget);
+    final canInteract = widget.enabled && !busy && !readOnly;
 
-    if (_loading || _initializing) return;
+    final hasProgress = progress != null && progress != -1;
 
-    if (widget.selected is bool && widget.selected != oldWidget.selected) {
-      _selected = widget.selected as bool;
-    }
-  }
+    Widget progressBar;
 
-  Future<void> _initSelected() async {
-    final val = widget.selected;
-
-    if (val == null) {
-      _selected = widget.defaultSelected;
-      _initializing = false;
-      return;
-    }
-
-    if (val is bool) {
-      _selected = val;
-      _initializing = false;
-      return;
-    }
-
-    if (val is AsyncSelectedGetter) {
-      try {
-        _selected = await val().timeout(widget.timeout);
-      } on TimeoutException catch (e, s) {
-        _handleError(e, s);
-        _selected = widget.defaultSelected;
-      } catch (e, s) {
-        _handleError(e, s);
-        _selected = widget.defaultSelected;
-      } finally {
-        if (mounted) setState(() => _initializing = false);
-      }
-      return;
-    }
-
-    throw ArgumentError('selected 必须是 bool / AsyncSelectedGetter / null');
-  }
-
-  Future<void> _handleChange(bool value) async {
-    if (_loading || _initializing) return;
-
-    final oldValue = _selected;
-    setState(() => _loading = true);
-
-    try {
-      final ok = await widget.onSelected(value).timeout(widget.timeout);
-      if (!ok) throw StateError('操作被拒绝');
-      if (mounted) setState(() => _selected = value);
-    } on TimeoutException catch (e, s) {
-      _handleError(e, s);
-      _selected = oldValue;
-    } catch (e, s) {
-      _handleError(e, s);
-      _selected = oldValue;
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  void _handleError(Object error, [StackTrace? stack]) {
-    if (widget.onError != null) {
-      widget.onError!(error, stack);
+    if (hasProgress) {
+      progressBar = LinearProgressIndicator(value: progress, minHeight: 2);
+    } else if (busy) {
+      progressBar = const LinearProgressIndicator(minHeight: 2);
     } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $error'), duration: const Duration(seconds: 2), showCloseIcon: true),
-        );
-      });
+      progressBar = const SizedBox(height: 2);
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final busy = _loading || _initializing;
-
-    final enabled = widget.enabled && !busy;
-    final disabledOpacity = enabled ? 1.0 : 0.5;
 
     return Material(
       color: Colors.transparent,
       borderRadius: widget.borderRadius,
       child: InkWell(
         borderRadius: widget.borderRadius,
-        onTap: enabled ? () => _handleChange(!_selected) : null,
+        onTap: canInteract ? () => changeValue(!selected) : null,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedOpacity(
-              opacity: disabledOpacity,
+              opacity: canInteract ? 1.0 : 0.5,
               duration: const Duration(milliseconds: 150),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (widget.title != null) widget.title!,
-                          if (widget.subtitle != null)
-                            Padding(padding: const EdgeInsets.only(top: 0), child: widget.subtitle!),
-                        ],
-                      ),
-                    ),
-                    Switch(
-                      value: _selected,
-                      onChanged: enabled ? _handleChange : null,
-                    ),
-                  ],
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [if (widget.title != null) widget.title!, if (widget.subtitle != null) widget.subtitle!]),
+                  ),
+                  Switch(value: selected, onChanged: canInteract ? changeValue : null),
+                ],
               ),
             ),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: busy ? const LinearProgressIndicator(minHeight: 2) : const SizedBox(height: 2),
-            ),
+            AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: progressBar),
           ],
         ),
       ),

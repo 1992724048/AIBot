@@ -1,203 +1,327 @@
-﻿import 'dart:async';
+﻿import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-typedef AsyncValueGetter<T> = Future<T> Function();
-typedef AsyncValueSetter<T> = Future<bool> Function(T value);
-typedef ErrorCallback = void Function(Object error, StackTrace? stack);
+import 'AsyncWidget.dart';
+
 typedef DropdownItemBuilder = Widget Function(String item);
 
-class AsyncDropdown extends StatefulWidget {
-  final String label;
-  final dynamic value;
-  final dynamic items;
-  final String? defaultValue;
-  final AsyncValueSetter<String> onChanged;
-  final Duration timeout;
-  final ErrorCallback? onError;
+class AsyncDropdown extends AsyncWidget<String, AsyncDropdown> {
+  final String? label;
+  final DropdownItemBuilder? itemEndBuilder;
+  final DropdownItemBuilder? itemBeginBuilder;
   final DropdownItemBuilder? itemBuilder;
+  final String searchHint;
 
   const AsyncDropdown({
     super.key,
-    required this.label,
-    required this.items,
-    required this.onChanged,
-    this.value,
-    this.defaultValue,
-    this.timeout = const Duration(days: 1),
-    this.onError,
+    this.label,
+    this.searchHint = "搜索 (正则)",
+    this.itemEndBuilder,
+    this.itemBeginBuilder,
     this.itemBuilder,
+    super.defaultValue,
+    super.getter,
+    super.setter,
+    super.itemsGetter,
+    super.errorHandler,
+    super.timeoutTime,
+    super.showDefaultError,
+    super.progressNotifier,
+    super.readOnlyNotifier,
   });
+
+  @override
+  AsyncDropdown copyWith({
+    String? defaultValue,
+    AsyncValueGetter<String>? getter,
+    AsyncValueSetter<String>? setter,
+    ErrorCallback? errorHandler,
+    Duration? timeout,
+    bool? showDefaultError,
+    AsyncDrawer<String>? drawer,
+    AsyncItemsGetter<String>? itemsGetter,
+    ValueNotifier<double>? progressNotifier,
+    ValueNotifier<bool>? readOnlyNotifier,
+  }) {
+    return AsyncDropdown(
+      key: key,
+      label: label,
+      searchHint: searchHint,
+      defaultValue: defaultValue ?? this.defaultValue,
+      getter: getter ?? this.getter,
+      setter: setter ?? this.setter,
+      itemsGetter: itemsGetter ?? this.itemsGetter,
+      errorHandler: errorHandler ?? this.errorHandler,
+      timeoutTime: timeout ?? timeoutTime,
+      showDefaultError: showDefaultError ?? this.showDefaultError,
+      progressNotifier: progressNotifier ?? this.progressNotifier,
+      readOnlyNotifier: readOnlyNotifier ?? this.readOnlyNotifier,
+      itemEndBuilder: itemEndBuilder,
+      itemBeginBuilder: itemBeginBuilder,
+      itemBuilder: itemBuilder,
+    );
+  }
 
   @override
   State<AsyncDropdown> createState() => _AsyncDropdownState();
 }
 
-class _AsyncDropdownState extends State<AsyncDropdown> {
+class _AsyncDropdownState extends AsyncWidgetState<String, AsyncDropdown> with SingleTickerProviderStateMixin {
+  final LayerLink _layerLink = LayerLink();
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  final TextEditingController _displayController = TextEditingController();
+  OverlayEntry? _overlay;
+
+  late AnimationController _anim;
+  late Animation<double> _fade;
+  late Animation<double> _scale;
+
   List<String> _items = [];
-  String? _value;
+  List<String> _filtered = [];
 
-  bool _loadingItems = false;
-  bool _loadingValue = false;
-  bool _saving = false;
+  bool _openUp = false;
 
-  bool get _busy => _loadingItems || _loadingValue || _saving;
+  static const double _dropdownGap = 6;
+  static const double _itemHeight = 40;
+  static const double _searchHeight = 56;
+  static const double _maxHeight = 320;
 
   @override
   void initState() {
     super.initState();
-    _initItems();
-    _initValue();
+    _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 180));
+    _fade = CurvedAnimation(parent: _anim, curve: Curves.easeOut);
+    _scale = Tween(begin: 0.95, end: 1.0).animate(_fade);
+    _searchController.addListener(_filter);
   }
 
-  Future<void> _initItems() async {
-    final src = widget.items;
-
-    if (src is List<String>) {
-      _items = src;
-      return;
-    }
-
-    if (src is AsyncValueGetter<List<String>>) {
-      setState(() => _loadingItems = true);
-      try {
-        _items = await src().timeout(widget.timeout);
-      } catch (e, s) {
-        _handleError(e, s);
-        _items = [];
-      } finally {
-        if (mounted) setState(() => _loadingItems = false);
-      }
-    }
-  }
-
-  Future<void> _initValue() async {
-    final val = widget.value;
-
-    if (val == null) {
-      _value = widget.defaultValue;
-      return;
-    }
-
-    if (val is String) {
-      _value = val;
-      return;
-    }
-
-    if (val is AsyncValueGetter<String>) {
-      setState(() => _loadingValue = true);
-      try {
-        _value = await val().timeout(widget.timeout);
-      } catch (e, s) {
-        _handleError(e, s);
-        _value = widget.defaultValue;
-      } finally {
-        if (mounted) setState(() => _loadingValue = false);
-      }
-    }
-  }
-
-  Future<void> _handleChanged(String newValue) async {
-    if (_busy) return;
-
-    final old = _value;
-    if (newValue == old) {
-      return;
-    }
-
-    setState(() {
-      _saving = true;
-      _value = newValue;
-    });
-
-    try {
-      final ok = await widget.onChanged(newValue).timeout(widget.timeout);
-      if (!ok) throw StateError('操作被拒绝');
-    } catch (e, s) {
-      _handleError(e, s);
-      _value = old;
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  void _handleError(Object error, [StackTrace? stack]) {
-    if (widget.onError != null) {
-      widget.onError!(error, stack);
+  void _filter() {
+    final text = _searchController.text.trim();
+    if (text.isEmpty) {
+      _filtered = List.from(_items);
     } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(showCloseIcon: true, duration: const Duration(seconds: 2), content: Text('操作失败: $error')));
-      });
+      try {
+        final reg = RegExp(text, caseSensitive: false);
+        _filtered = _items.where((e) => reg.hasMatch(e)).toList();
+      } catch (_) {
+        _filtered = [];
+      }
     }
+    _overlay?.markNeedsBuild();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
+  double _calcHeight() {
+    final h = _searchHeight + _filtered.length * _itemHeight;
+    return min(_maxHeight, h);
+  }
 
-    Widget buildItem(String item) {
-      final child = widget.itemBuilder?.call(item) ?? Text(item);
-      return Align(alignment: Alignment.centerLeft, child: child);
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(widget.label, style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 4),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            return Stack(
-              alignment: Alignment.center,
+  void _open(List<String> items) {
+    final renderBox = context.findRenderObject() as RenderBox;
+    final size = renderBox.size;
+    final offset = renderBox.localToGlobal(Offset.zero);
+    final screenHeight = MediaQuery.of(context).size.height;
+    _items = items;
+    _filtered = List.from(items);
+    final dropdownHeight = _calcHeight();
+    final spaceBelow = screenHeight - offset.dy - size.height;
+    final spaceAbove = offset.dy;
+    _openUp = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+    final offsetY = _openUp ? -(dropdownHeight + _dropdownGap) : size.height + _dropdownGap;
+    _overlay = OverlayEntry(
+      builder: (context) {
+        final width = size.width;
+        return Positioned.fill(
+          child: GestureDetector(
+            onTap: close,
+            behavior: HitTestBehavior.translucent,
+            child: Stack(
               children: [
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: _value,
-                  items: _items
-                      .map(
-                        (e) => DropdownMenuItem<String>(
-                          value: e,
-                          child: SizedBox(width: constraints.maxWidth, child: buildItem(e)),
+                Positioned.fill(
+                  child: GestureDetector(onTap: close, behavior: HitTestBehavior.opaque),
+                ),
+                CompositedTransformFollower(
+                  link: _layerLink,
+                  offset: Offset(0, offsetY),
+                  child: FadeTransition(
+                    opacity: _fade,
+                    child: ScaleTransition(
+                      scale: _scale,
+                      alignment: _openUp ? Alignment.bottomCenter : Alignment.topCenter,
+                      child: Material(
+                        elevation: 4,
+                        borderRadius: BorderRadius.circular(5),
+                        clipBehavior: Clip.antiAlias,
+                        child: SizedBox(
+                          width: width,
+                          height: _calcHeight(),
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                height: _searchHeight,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: TextField(
+                                    controller: _searchController,
+                                    autofocus: true,
+                                    decoration: InputDecoration(
+                                      prefixIcon: const Icon(Icons.search),
+                                      hintText: widget.searchHint,
+                                      suffixIcon: _searchController.text.isEmpty
+                                          ? null
+                                          : IconButton(
+                                              icon: const Icon(Icons.clear),
+                                              onPressed: () {
+                                                _searchController.clear();
+                                              },
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Material(
+                                  type: MaterialType.transparency,
+                                  child: ScrollConfiguration(
+                                    behavior: const ScrollBehavior().copyWith(scrollbars: true),
+                                    child: ListView.builder(
+                                      physics: const BouncingScrollPhysics(),
+                                      itemCount: _filtered.length,
+                                      itemBuilder: (context, i) {
+                                        final item = _filtered[i];
+                                        return InkWell(
+                                          onTap: () {
+                                            changeValue(item);
+                                            close();
+                                          },
+                                          child: SizedBox(
+                                            height: _itemHeight,
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                                              child: Row(
+                                                children: [
+                                                  ?widget.itemBeginBuilder?.call(item),
+                                                  Expanded(
+                                                    child: widget.itemBuilder?.call(item) ?? Baseline(baseline: 16, baselineType: TextBaseline.alphabetic, child: Text(item)),
+                                                  ),
+                                                  ?widget.itemEndBuilder?.call(item),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      )
-                      .toList(),
-                  onChanged: _busy ? null : (v) => _handleChanged(v!),
-                  style: textTheme.bodyMedium,
-                  dropdownColor: colorScheme.surface,
-                  icon: Icon(Icons.arrow_drop_down, color: colorScheme.primary),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: colorScheme.surface,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colorScheme.outline),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colorScheme.outlineVariant),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                      ),
                     ),
                   ),
                 ),
-                if (_busy)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: Center(child: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))),
-                    ),
-                  ),
               ],
-            );
-          },
-        ),
-      ],
+            ),
+          ),
+        );
+      },
     );
+    Overlay.of(context).insert(_overlay!);
+    _anim.forward();
+    setState(() {});
+  }
+
+  void close() {
+    if (_overlay == null) return;
+    _anim.reverse().then((_) {
+      _overlay?.remove();
+      _overlay = null;
+      _searchController.clear();
+      _focusNode.unfocus();
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  Widget buildContent(BuildContext context, String? value, bool busy, double? progress, List<String>? items) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    if (value != null && _displayController.text != value) {
+      _displayController.text = value;
+    }
+
+    final decorationWidget = value == null ? null : widget.itemEndBuilder?.call(value);
+    final beginWidget = value == null ? null : widget.itemBeginBuilder?.call(value);
+
+    return IgnorePointer(
+      ignoring: busy,
+      child: CompositedTransformTarget(
+        link: _layerLink,
+        child: AnimatedOpacity(
+          opacity: busy ? 0.6 : 1,
+          duration: const Duration(milliseconds: 120),
+          child: TextField(
+            controller: _displayController,
+            readOnly: true,
+            focusNode: _focusNode,
+            style: TextStyle(fontSize: 14),
+            onTap: () {
+              if (_overlay == null) {
+                _open(items ?? []);
+              } else {
+                close();
+              }
+            },
+            decoration: InputDecoration(
+              labelText: widget.label,
+              filled: true,
+              fillColor: colorScheme.surface,
+              prefixIcon: beginWidget == null
+                  ? null
+                  : Padding(
+                      padding: const EdgeInsets.only(left: 8, right: 4),
+                      child: SizedBox(height: 40, child: beginWidget),
+                    ),
+              suffixIcon: SizedBox(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (decorationWidget != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 1),
+                        child: SizedBox(height: 40, child: decorationWidget),
+                      ),
+                    busy
+                        ? SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 3, value: progress, valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary)),
+                          )
+                        : AnimatedRotation(
+                            turns: _overlay != null ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 120),
+                            child: SizedBox(height: 40, width: 40, child: const Icon(Icons.arrow_drop_down)),
+                          ),
+                  ],
+                ),
+              ),
+              border: const UnderlineInputBorder(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    _searchController.dispose();
+    _focusNode.dispose();
+    super.dispose();
   }
 }

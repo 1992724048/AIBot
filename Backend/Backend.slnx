@@ -11,6 +11,7 @@
   <Project Path="../../Library/parallel_hashmap/parallel_hashmap.vcxitems" Id="fb975bce-5eab-4257-92f9-8a19bf995845" />
   <Project Path="../../Library/stdpp/stdpp.vcxitems" Id="83123dd2-7a7e-496b-9b5d-e426d0ee48e3" />
   <Project Path="../../Library/toml11/toml11.vcxitems" Id="52546c69-9f00-46c5-8706-9d6a152876ee" />
+  <Project Path="../../Library/v8/v8.vcxitems" Id="b9dfbdc8-82a4-4d3d-956c-ad73ca312121" />
   <Project Path="../../Library/zlib/zlib.vcxitems" Id="a19772eb-042d-4a04-a0d7-ab2fe8094a6f" />
   <Project Path="Backend/Backend.vcxproj" Id="d573f1dd-6d5c-491c-b58e-62bf888c712e" />
   <Project Path="Update/Update.csproj" Id="abcd1dac-5d90-4da8-be90-34585b55896d" />

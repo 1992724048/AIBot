@@ -1,11 +1,15 @@
 ﻿// 遂沫 screenshot.cpp
-// 2026-02-22 17:36:26
+// 2026-02-27 03:23:43
 
 #include "screenshot.h"
 #include "page/preveiw/preveiw.h"
 #include "stdpp/encode.h"
 
 #include <chrono>
+
+#include "module/ModelBackend.h"
+
+#include "stdpp/thread.hpp"
 
 using namespace std::chrono_literals;
 using namespace module;
@@ -23,13 +27,24 @@ auto Screenshot::get_monitor() -> std::vector<std::string> {
 }
 
 auto Screenshot::start_monitor() -> void {
+    static stdpp::thread::Pool pool;
     stop_monitor();
     jthread = std::jthread([](const std::stop_token& stoken) {
         cv::Mat temp;
+        std::future<std::optional<std::vector<std::pair<int, cv::Rect_<int>>>>> future;
+        std::chrono::time_point<std::chrono::steady_clock> frame_start = std::chrono::steady_clock::now();
         while (!stoken.stop_requested()) {
-            const std::chrono::time_point<std::chrono::steady_clock> frame_start = std::chrono::steady_clock::now();
-
             const auto ins = PreviewPage::instance();
+            {
+                auto _ = ins->async_capture.read_lock();
+                if (!ins->async_capture) {
+                    future.wait();
+                }
+            }
+
+            fps_limit(frame_start);
+            frame_start = std::chrono::steady_clock::now();
+
             int target_width;
             int target_height;
             {
@@ -40,12 +55,36 @@ auto Screenshot::start_monitor() -> void {
             }
 
             if (capture(temp, {target_width, target_height})) {
+                if (temp.empty()) {
+                    continue;
+                }
                 std::unique_lock lock(mutex);
                 frame = temp.clone();
             }
 
-            ins->put_image(temp);
-            fps_limit(frame_start);
+            auto _ = ins->show_detect.read_lock();
+            if (future.valid()) {
+                future.wait();
+
+                if (ins->show_detect) {
+                    if (auto value = future.get()) {
+                        for (const auto& [id, box] : value.value()) {
+                            rectangle(temp, box, cv::Scalar(0, 255, 0), 2);
+                            std::string label = std::format("ID:{}:{}", id, ModelPage::instance()->get_tag_name(id));
+
+                            int baseline = 0;
+                            cv::Size text_size = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseline);
+                            cv::Rect bg_rect(box.x, box.y - text_size.height - 5, text_size.width, text_size.height + baseline);
+                            rectangle(temp, bg_rect, cv::Scalar(0, 255, 0), cv::FILLED);
+                            putText(temp, label, {box.x, box.y - 5}, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 1);
+                        }
+                    }
+                }
+
+                ins->put_image(temp);
+            }
+
+            future = pool.push(ModelBackendManager::infer, frame);
         }
     });
 }

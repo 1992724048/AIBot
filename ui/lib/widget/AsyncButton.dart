@@ -1,98 +1,91 @@
-﻿import 'dart:async';
+﻿import 'package:flutter/material.dart';
 
-import 'package:flutter/material.dart';
+import 'AsyncWidget.dart';
 
 enum AsyncButtonType { elevated, outlined, text }
 
-class AsyncButton extends StatefulWidget {
-  final Future<bool> Function() onPressed;
-  final void Function(Object error, StackTrace? stack)? onError;
+class AsyncButton extends AsyncActionWidget<AsyncButton> {
   final Widget child;
   final AsyncButtonType type;
   final ButtonStyle? style;
   final double loadingIndicatorSize;
-  final Duration timeout;
 
   const AsyncButton({
     super.key,
-    required this.onPressed,
-    this.onError,
+    super.action_,
+    super.errorHandler,
+    super.timeout,
+    super.progressNotifier,
+    super.readOnlyNotifier,
     required this.child,
     this.type = AsyncButtonType.elevated,
     this.style,
     this.loadingIndicatorSize = 18,
-    this.timeout = const Duration(seconds: 10),
   });
+
+  @override
+  AsyncButton copyWith({Future<bool> Function()? action_, ErrorCallback? errorHandler, Duration? timeout, ValueNotifier<double>? progressNotifier, ValueNotifier<bool>? readOnlyNotifier}) {
+    return AsyncButton(
+      key: key,
+      action_: action_ ?? this.action_,
+      errorHandler: errorHandler ?? this.errorHandler,
+      timeout: timeout ?? this.timeout,
+      progressNotifier: progressNotifier ?? this.progressNotifier,
+      readOnlyNotifier: readOnlyNotifier ?? this.readOnlyNotifier,
+      type: type,
+      style: style,
+      loadingIndicatorSize: loadingIndicatorSize,
+      child: child,
+    );
+  }
 
   @override
   State<AsyncButton> createState() => _AsyncButtonState();
 }
 
-class _AsyncButtonState extends State<AsyncButton> {
-  bool _running = false;
-
-  Future<void> _handle() async {
-    if (_running) return;
-    setState(() => _running = true);
-
-    try {
-      final success = await widget.onPressed().timeout(widget.timeout, onTimeout: () => false);
-      if (!success && mounted) _show('操作失败');
-    } on TimeoutException catch (e, s) {
-      _handleError(e, s);
-    } catch (e, s) {
-      _handleError(e, s);
-    } finally {
-      if (mounted) setState(() => _running = false);
-    }
-  }
-
-  void _handleError(Object e, StackTrace? s) {
-    final onError = widget.onError;
-    if (onError != null) {
-      onError(e, s);
-    } else {
-      _show('出错了：$e');
-    }
-  }
-
-  void _show(String msg) {
-    ScaffoldMessenger.maybeOf(
-      context,
-    )?.showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 2), showCloseIcon: true));
-  }
-
+class _AsyncButtonState extends AsyncActionWidgetState<AsyncButton> {
   @override
-  Widget build(BuildContext context) {
+  Widget buildContent(BuildContext context, bool busy, double? progress) {
     final theme = Theme.of(context);
-    final style =
-        widget.style ??
-        (widget.type == AsyncButtonType.elevated
-            ? ElevatedButton.styleFrom()
-            : widget.type == AsyncButtonType.text
-            ? TextButton.styleFrom()
-            : OutlinedButton.styleFrom());
+    final colorScheme = theme.colorScheme;
 
-    Widget content = AnimatedSwitcher(
-      duration: Duration(microseconds: 200),
-      child: _running
-          ? SizedBox.square(
-              dimension: widget.loadingIndicatorSize,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: style.foregroundColor?.resolve({.disabled}) ?? theme.colorScheme.onPrimary,
-              ),
-            )
-          : widget.child,
-    );
+    final hasProgress = progress != null && progress != -1;
 
-    switch (widget.type) {
-      case AsyncButtonType.elevated:
-        return ElevatedButton(onPressed: _running ? null : _handle, style: style, child: content);
-      case AsyncButtonType.text:
-        return TextButton(onPressed: _running ? null : _handle, style: style, child: content);
-      case AsyncButtonType.outlined:
-        return OutlinedButton(onPressed: _running ? null : _handle, style: style, child: content);
+    Widget buildButton(Widget child) {
+      switch (widget.type) {
+        case AsyncButtonType.elevated:
+          return ElevatedButton(onPressed: busy ? null : execute, style: widget.style, child: child);
+        case AsyncButtonType.text:
+          return TextButton(onPressed: busy ? null : execute, style: widget.style, child: child);
+        case AsyncButtonType.outlined:
+          return OutlinedButton(onPressed: busy ? null : execute, style: widget.style, child: child);
+      }
     }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            if (busy)
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: hasProgress
+                      ? Align(
+                          alignment: Alignment.centerLeft,
+                          child: FractionallySizedBox(
+                            widthFactor: progress.clamp(0, 1),
+                            child: Container(color: colorScheme.primary.withAlpha(127)),
+                          ),
+                        )
+                      : LinearProgressIndicator(backgroundColor: Colors.transparent),
+                ),
+              ),
+            buildButton(AnimatedOpacity(duration: const Duration(milliseconds: 200), opacity: busy ? 0.5 : 1.0, child: widget.child)),
+          ],
+        );
+      },
+    );
   }
 }

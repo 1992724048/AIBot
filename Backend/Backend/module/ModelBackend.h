@@ -1,5 +1,5 @@
 ﻿// 遂沫 ModelBackend.h
-// 2026-02-22 21:50:27
+// 2026-02-26 21:13:47
 
 #pragma once
 #include <atomic>
@@ -8,6 +8,8 @@
 #include <optional>
 
 #include <opencv2/opencv.hpp>
+
+#include "page/model/model.h"
 
 namespace module {
     enum class BackendDeviceEnum : int { CPU, GPU, NPU };
@@ -25,10 +27,10 @@ namespace module {
         ModelBackendAbstract() = default;
         virtual ~ModelBackendAbstract() = default;
 
-        virtual auto set_device(const std::string& device_name) -> void = 0;
+        virtual auto set_device(const std::string& device_name) -> bool = 0;
         virtual auto get_devices() -> std::vector<DeviceInfo> = 0;
         virtual auto load(const std::filesystem::path& path) -> bool = 0;
-        virtual auto infer(const cv::Mat& frame) -> std::optional<std::vector<cv::Size>> = 0;
+        virtual auto infer(const cv::Mat& frame) -> std::optional<std::vector<std::pair<int, cv::Rect>>> = 0;
 
         ModelBackendAbstract(const ModelBackendAbstract& other) = delete;
         ModelBackendAbstract(ModelBackendAbstract&& other) noexcept = delete;
@@ -51,19 +53,26 @@ namespace module {
             current = std::make_shared<T>();
         }
 
-        static auto load(const std::filesystem::path& path) -> bool;
-        static auto infer(const cv::Mat& frame) -> std::optional<std::vector<cv::Size>>;
+        static auto load(const std::shared_ptr<page::ModelInfo>& model) -> bool;
+        static auto infer(const cv::Mat& frame) -> std::optional<std::vector<std::pair<int, cv::Rect>>>;
         static auto set_device(const std::string& device_name) -> bool;
         static auto get_devices() -> std::vector<DeviceInfo>;
         static auto select(const std::string& name) -> bool;
         static auto get_backends() -> std::vector<std::string>;
+
+        static auto is_dynamic() -> bool {
+            return dynamic.load();
+        }
     protected:
+        inline static std::shared_mutex mutex;
+        inline static std::atomic_bool dynamic;
         inline static cv::Size input_size;
         inline static cv::Size output_size;
         inline static cv::Point2f scale_factor;
         inline static std::filesystem::path current_path;
-        inline static std::atomic<std::shared_ptr<ModelBackendAbstract>> current;
         inline static std::map<std::string, std::function<void()>> select_fn;
+        inline static std::atomic<std::shared_ptr<ModelBackendAbstract>> current;
+        inline static std::atomic<std::shared_ptr<page::ModelInfo>> current_model;
 
         friend ModelBackendAbstract;
         ModelBackendManager() = default;

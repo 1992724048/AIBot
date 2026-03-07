@@ -1,16 +1,16 @@
 ﻿import 'dart:async';
 import 'dart:math' as math;
 import 'dart:math';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:ui/ffi.dart';
 import 'package:ui/widget/AlertBlock.dart';
+import 'package:ui/widget/AsyncChip.dart';
 import 'package:ui/widget/AsyncDropdown.dart';
-import 'package:ui/widget/AsyncInputChip.dart';
-import 'package:ui/widget/AsyncStringInput.dart';
+import 'package:ui/widget/AsyncInput.dart';
 import 'package:ui/widget/AsyncSwitch.dart';
 import 'package:ui/widget/CustomCard.dart';
 import 'package:ui/widget/SmoothScrollView.dart';
@@ -19,22 +19,22 @@ class PreviewPage extends StatefulWidget {
   const PreviewPage({super.key});
 
   @override
-  _PreviewPageState createState() => _PreviewPageState();
+  State<StatefulWidget> createState() => _PreviewPageState();
 }
 
 class _PreviewPageState extends State<PreviewPage> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  late final _fpsLimit = FloatField("fps_limit", 120.0);
-  late final _windowHeight = IntField("window_height", 640);
-  late final _windowWidth = IntField("window_width", 640);
-  late final _asyncCapture = BoolField("async_capture", true);
-  late final _realTime = BoolField("real_time", false);
-  late final _showDetect = BoolField("show_detect", false);
-  late final _showFPS = BoolField("show_fps", false);
-  late final _desktopName = StringField("desktop_name", '');
-  late final _windowName = StringField("window_name", '');
-  late final _windowClass = StringField("window_class", '');
+  static final _fpsLimit = FloatField("PreviewPage::fps_limit", 120.0);
+  static final _windowHeight = IntField("PreviewPage::window_height", 640);
+  static final _windowWidth = IntField("PreviewPage::window_width", 640);
+  static final _asyncCapture = BoolField("PreviewPage::async_capture", true);
+  static final _realTime = BoolField("PreviewPage::real_time", false);
+  static final _showDetect = BoolField("PreviewPage::show_detect", false);
+  static final _showFPS = BoolField("PreviewPage::show_fps", false);
+  static final _desktopName = StringField("PreviewPage::desktop_name", '');
+  static final _windowName = StringField("PreviewPage::window_name", '');
+  static final _windowClass = StringField("PreviewPage::window_class", '');
 
   bool _isMonitoring = false;
   bool _isImageHandlerRegistered = false;
@@ -73,7 +73,9 @@ class _PreviewPageState extends State<PreviewPage> with AutomaticKeepAliveClient
           }
         }
       } catch (e) {
-        debugPrint('图像解码失败: $e');
+        if (kDebugMode) {
+          debugPrint('图像解码失败: $e');
+        }
       }
 
       return null;
@@ -170,25 +172,20 @@ class _PreviewPageState extends State<PreviewPage> with AutomaticKeepAliveClient
                   runAlignment: .start,
                   alignment: .start,
                   children: [
-                    AsyncInputChip(
+                    AsyncChip(
                       avatar: Icon(Icons.flash_on, size: 18),
-                      tooltip: "尽可能的显示更多画面\n最大限值: 60 FPS\n*性能开销: 极高",
+                      tooltip: "显示捕获画面\n*性能开销: 极高",
                       label: Baseline(
                         baseline: 14,
                         baselineType: TextBaseline.alphabetic,
                         child: Text('实时画面', style: TextStyle(fontSize: 14, height: 1.0)),
                       ),
-                      selected: () async {
-                        return await _realTime.get();
-                      },
-                      onSelected: (val) async {
-                        await _realTime.set(val);
-                        setState(() {});
-                        return true;
-                      },
-                    ),
+                    ).get(() async => await _realTime.get()).set((val) async {
+                      await _realTime.set(val);
+                      return true;
+                    }),
                     const SizedBox(width: 8),
-                    AsyncInputChip(
+                    AsyncChip(
                       avatar: Icon(Icons.lightbulb, size: 18),
                       tooltip: "在画面中标注出推理结果\n*性能开销: 高",
                       label: Baseline(
@@ -196,33 +193,23 @@ class _PreviewPageState extends State<PreviewPage> with AutomaticKeepAliveClient
                         baselineType: TextBaseline.alphabetic,
                         child: Text('推理结果', style: TextStyle(fontSize: 14, height: 1.0)),
                       ),
-                      selected: () async {
-                        return await _showDetect.get();
-                      },
-                      onSelected: (val) async {
-                        await _showDetect.set(val);
-                        setState(() {});
-                        return true;
-                      },
-                    ),
+                    ).get(() async => await _showDetect.get()).set((val) async {
+                      await _showDetect.set(val);
+                      return true;
+                    }),
                     const SizedBox(width: 8),
-                    AsyncInputChip(
+                    AsyncChip(
                       avatar: Icon(Icons.speed, size: 18),
-                      tooltip: "在画面左上角显示推理FPS与耗时\n*性能开销: 高",
+                      tooltip: "在画面左上角显示推理FPS与耗时\n*性能开销: 中",
                       label: Baseline(
                         baseline: 14,
                         baselineType: TextBaseline.alphabetic,
                         child: Text('FPS', style: TextStyle(fontSize: 14, height: 1.0)),
                       ),
-                      selected: () async {
-                        return await _showFPS.get();
-                      },
-                      onSelected: (val) async {
-                        await _showFPS.set(val);
-                        setState(() {});
-                        return true;
-                      },
-                    ),
+                    ).get(() async => await _showFPS.get()).set((val) async {
+                      await _showFPS.set(val);
+                      return true;
+                    }),
                   ],
                 ),
                 PlayPauseButton(
@@ -256,35 +243,29 @@ class _PreviewPageState extends State<PreviewPage> with AutomaticKeepAliveClient
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AlertBlock.note(child: Text("图像越大推理所需的算力越高, 过高的值可能会导致识别精度下降")),
-          const SizedBox(height: 18),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: AsyncStringInput(
-                  prefixIcon: Transform.rotate(angle: pi / 2, child: Icon(Icons.height)),
-                  label: '宽 (px)',
-                  initialValue: '640',
-                  value: () async => await _windowWidth.get(),
-                  keyboardType: .number,
-                  onSave: (String v) async {
-                    await _windowWidth.set(int.parse(v));
-                    return true;
-                  },
-                ),
+                child:
+                    AsyncInput(
+                      prefixIcon: Transform.rotate(angle: pi / 2, child: Icon(Icons.height)),
+                      label: '宽 (px)',
+                      defaultValue: '640',
+                      keyboardType: .number,
+                    ).get(() async => (await _windowWidth.get()).toString()).set((String v) async {
+                      await _windowWidth.set(int.parse(v));
+                      return true;
+                    }),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: AsyncStringInput(
-                  prefixIcon: Icon(Icons.height),
-                  label: '高 (px)',
-                  initialValue: '640',
-                  value: () async => await _windowHeight.get(),
-                  keyboardType: .number,
-                  onSave: (String v) async {
-                    await _windowHeight.set(int.parse(v));
-                    return true;
-                  },
-                ),
+                child: AsyncInput(prefixIcon: Icon(Icons.height), label: '高 (px)', defaultValue: '640', keyboardType: .number).get(() async => (await _windowHeight.get()).toString()).set((
+                  String v,
+                ) async {
+                  await _windowHeight.set(int.parse(v));
+                  return true;
+                }),
               ),
             ],
           ),
@@ -336,35 +317,26 @@ class _PreviewPageState extends State<PreviewPage> with AutomaticKeepAliveClient
       child: Column(
         children: [
           SizedBox(height: 5),
-          AsyncStringInput(
-            label: "最大捕获帧率",
-            initialValue: "30",
-            prefixIcon: Icon(Icons.shutter_speed),
-            keyboardType: TextInputType.number,
-            value: () async => _fpsLimit.get(),
-            onSave: (v) async {
-              final fps = float.tryParse(v);
-              if (fps != null && fps > 0) {
-                _fpsLimit.set(fps);
-                return true;
-              }
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入合法的整数值')));
-              return false;
-            },
-          ),
+          AsyncInput(label: "最大捕获帧率", defaultValue: "30", prefixIcon: Icon(Icons.shutter_speed), keyboardType: TextInputType.number).get(() async => (await _fpsLimit.get()).toString()).set((
+            String v,
+          ) async {
+            final fps = float.tryParse(v);
+            if (fps != null && fps > 0) {
+              _fpsLimit.set(fps);
+              return true;
+            }
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入合法的整数值')));
+            return false;
+          }),
           Divider(thickness: 1),
           AsyncSwitch(
             title: Text("异步捕获"),
             subtitle: Text("使用独立线程进行屏幕捕获，但会增加一帧延迟和资源占用", style: TextStyle(fontSize: 13)),
             borderRadius: BorderRadius.circular(5),
-            onSelected: (v) async {
-              await _asyncCapture.set(v);
-              return true;
-            },
-            selected: () async {
-              return await _asyncCapture.get();
-            },
-          ),
+          ).get(() async => await _asyncCapture.get()).set((v) async {
+            await _asyncCapture.set(v);
+            return true;
+          }),
           const SizedBox(height: 5),
           AlertBlock.tip(child: Text("推荐开启，仅当CPU资源紧张时关闭")),
           AnimatedSize(
@@ -387,54 +359,33 @@ class _PreviewPageState extends State<PreviewPage> with AutomaticKeepAliveClient
   }
 
   Widget _DesktopScreenshot() {
-    return AsyncDropdown(
-      label: "显示器标识",
-      defaultValue: "",
-      value: () async {
-        return await _desktopName.get();
-      },
-      items: () async {
-        final result = await "get_monitor".cpp.invoke();
-        if (result is List) {
-          return result.map((e) => e.toString()).toList();
-        }
-        return <String>[];
-      },
-      onChanged: (String v) async {
-        await _desktopName.set(v);
-        return true;
-      },
-    );
+    return AsyncDropdown(label: "显示器标识", defaultValue: "")
+        .get(() async => await _desktopName.get())
+        .items(() async {
+          final result = await "get_monitor".cpp.invoke();
+          if (result is List) {
+            return result.map((e) => e.toString()).toList();
+          }
+          return <String>[];
+        })
+        .set((String v) async {
+          await _desktopName.set(v);
+          return true;
+        });
   }
 
   Widget _WindowScreenshot() {
     return Column(
       children: [
-        AsyncStringInput(
-          label: "窗口名称",
-          prefixIcon: Icon(Icons.title),
-          keyboardType: TextInputType.text,
-          value: () async {
-            return await _windowName.get();
-          },
-          onSave: (v) async {
-            await _windowName.set(v);
-            return true;
-          },
-        ),
+        AsyncInput(label: "窗口名称", prefixIcon: Icon(Icons.title), keyboardType: TextInputType.text).get(() async => await _windowName.get()).set((v) async {
+          await _windowName.set(v);
+          return true;
+        }),
         SizedBox(height: 8),
-        AsyncStringInput(
-          label: "窗口类名",
-          prefixIcon: Icon(Icons.tag),
-          keyboardType: TextInputType.text,
-          value: () async {
-            return await _windowClass.get();
-          },
-          onSave: (v) async {
-            await _windowClass.set(v);
-            return true;
-          },
-        ),
+        AsyncInput(label: "窗口类名", prefixIcon: Icon(Icons.tag), keyboardType: TextInputType.text).get(() async => await _windowClass.get()).set((v) async {
+          await _windowClass.set(v);
+          return true;
+        }),
       ],
     );
   }

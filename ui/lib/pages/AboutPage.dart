@@ -5,7 +5,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:ui/widget/AlertBlock.dart';
 import 'package:ui/widget/AsyncButton.dart';
 import 'package:ui/widget/AsyncCheckbox.dart';
-import 'package:ui/widget/AsyncStringInput.dart';
+import 'package:ui/widget/AsyncInput.dart';
 import 'package:ui/widget/CustomCard.dart';
 import 'package:ui/widget/SmoothScrollView.dart';
 
@@ -84,19 +84,14 @@ class _AboutPageState extends State<AboutPage> with AutomaticKeepAliveClientMixi
               Text('设备码：', style: textTheme.titleSmall),
               SelectableText('ABCD-EFGH-IJKL-MNOP', style: textTheme.titleSmall),
               Spacer(),
-              AsyncButton(
-                onPressed: () async {
-                  if (_agreedToUserAgreement && _agreedToPrivacyPolicy) {
-                    return true;
-                  } else {
-                    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                      SnackBar(content: Text('请先同意用户协议和隐私政策'), duration: Duration(seconds: 2), showCloseIcon: true),
-                    );
-                    return false;
-                  }
-                },
-                child: Text('复制'),
-              ),
+              AsyncButton(child: Text('复制')).action(() async {
+                if (_agreedToUserAgreement && _agreedToPrivacyPolicy) {
+                  return true;
+                } else {
+                  ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('请先同意用户协议和隐私政策'), duration: Duration(seconds: 2), showCloseIcon: true));
+                  return false;
+                }
+              }),
             ],
           ),
           SizedBox(height: 10),
@@ -105,29 +100,17 @@ class _AboutPageState extends State<AboutPage> with AutomaticKeepAliveClientMixi
           Row(
             children: [
               Expanded(
-                child: SizedBox(
-                  height: 34,
-                  child: AsyncStringInput(
-                    label: '请输入密钥',
-                    textStyle: const TextStyle(fontSize: 14),
-                    value: () async => '',
-                  ),
-                ),
+                child: AsyncInput(label: '请输入密钥', textStyle: const TextStyle(fontSize: 14)).get(() async => ''),
               ),
               SizedBox(width: 10),
-              AsyncButton(
-                onPressed: () async {
-                  if (_agreedToUserAgreement && _agreedToPrivacyPolicy) {
-                    return true;
-                  } else {
-                    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                      SnackBar(content: Text('请先同意用户协议和隐私政策'), duration: Duration(seconds: 2), showCloseIcon: true),
-                    );
-                    return false;
-                  }
-                },
-                child: Text('激活'),
-              ),
+              AsyncButton(child: Text('激活')).action(() async {
+                if (_agreedToUserAgreement && _agreedToPrivacyPolicy) {
+                  return true;
+                } else {
+                  ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('请先同意用户协议和隐私政策'), duration: Duration(seconds: 2), showCloseIcon: true));
+                  return false;
+                }
+              }),
             ],
           ),
           SizedBox(height: 10),
@@ -159,10 +142,7 @@ class _AboutPageState extends State<AboutPage> with AutomaticKeepAliveClientMixi
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [SelectableText("版本: 0.1.0"), SelectableText("构建号: 20251229")],
-      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [SelectableText("版本: 0.1.0"), SelectableText("构建号: 20251229")]),
     );
   }
 
@@ -208,16 +188,11 @@ class _AboutPageState extends State<AboutPage> with AutomaticKeepAliveClientMixi
             style: textTheme.titleSmall,
           ),
           Divider(thickness: 1),
-          AsyncCheckbox(
-            title: Text("我已阅读并同意用户协议", style: textTheme.titleSmall),
-            onSelected: (bool selected) async {
-              await Future.delayed(Duration(seconds: 1));
-              _agreedToUserAgreement = selected;
-              return true;
-            },
-            defaultSelected: false,
-            selected: false,
-          ),
+          AsyncCheckbox(title: Text("我已阅读并同意用户协议", style: textTheme.titleSmall)).get(() async => _agreedToUserAgreement).set((bool selected) async {
+            await Future.delayed(Duration(seconds: 1));
+            _agreedToUserAgreement = selected;
+            return true;
+          }),
         ],
       ),
     );
@@ -287,16 +262,11 @@ class _AboutPageState extends State<AboutPage> with AutomaticKeepAliveClientMixi
             style: textTheme.titleSmall,
           ),
           Divider(thickness: 1),
-          AsyncCheckbox(
-            title: Text("我已阅读并同意隐私政策", style: textTheme.titleSmall),
-            onSelected: (bool selected) async {
-              await Future.delayed(Duration(seconds: 1));
-              _agreedToPrivacyPolicy = selected;
-              return true;
-            },
-            defaultSelected: false,
-            selected: false,
-          ),
+          AsyncCheckbox(title: Text("我已阅读并同意隐私政策", style: textTheme.titleSmall)).get(() async => _agreedToPrivacyPolicy).set((bool selected) async {
+            await Future.delayed(Duration(seconds: 1));
+            _agreedToPrivacyPolicy = selected;
+            return true;
+          }),
         ],
       ),
     );

@@ -50,6 +50,9 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\MeshContentTask.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\ShaderGraphContentTask.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
     <Import Project="..\..\..\Library\Flutter\Flutter.vcxitems" Label="Shared" />
@@ -61,6 +64,7 @@
     <Import Project="..\..\..\Library\parallel_hashmap\parallel_hashmap.vcxitems" Label="Shared" />
     <Import Project="..\..\..\Library\zlib\zlib.vcxitems" Label="Shared" />
     <Import Project="..\..\..\Library\OpenVINO\OpenVINO.vcxitems" Label="Shared" />
+    <Import Project="..\..\..\Library\v8\v8.vcxitems" Label="Shared" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -71,15 +75,21 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)</IntDir>
+    <TargetName>ui</TargetName>
+    <LinkDelaySign>
+    </LinkDelaySign>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)</IntDir>
+    <TargetName>ui</TargetName>
+    <LinkDelaySign>
+    </LinkDelaySign>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions);NOMINMAX</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions);NOMINMAX;V8_ENABLE_CHECKS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -105,10 +115,15 @@
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateMapFile>true</GenerateMapFile>
       <MapExports>true</MapExports>
+      <SetChecksum>true</SetChecksum>
+      <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
     </Link>
     <Manifest>
       <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
     </Manifest>
+    <ResourceCompile>
+      <Culture>0x0804</Culture>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -145,10 +160,15 @@
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateMapFile>true</GenerateMapFile>
       <MapExports>true</MapExports>
+      <SetChecksum>true</SetChecksum>
+      <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
     </Link>
     <Manifest>
       <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
     </Manifest>
+    <ResourceCompile>
+      <Culture>0x0804</Culture>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -156,6 +176,7 @@
     <ClCompile Include="module\openvino\openvino.cpp" />
     <ClCompile Include="module\screenshot\screenshot.cpp" />
     <ClCompile Include="page\backend\backend.cpp" />
+    <ClCompile Include="page\control\control.cpp" />
     <ClCompile Include="page\model\model.cpp" />
     <ClCompile Include="page\preveiw\preveiw.cpp" />
   </ItemGroup>
@@ -164,10 +185,21 @@
     <ClInclude Include="module\openvino\openvino.h" />
     <ClInclude Include="module\screenshot\screenshot.h" />
     <ClInclude Include="page\backend\backend.h" />
+    <ClInclude Include="page\control\control.h" />
     <ClInclude Include="page\model\model.h" />
     <ClInclude Include="page\preveiw\preveiw.h" />
+    <ClInclude Include="Resource\resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Resource\icon.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resource\Resource.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\MeshContentTask.targets" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\ShaderGraphContentTask.targets" />
   </ImportGroup>
 </Project>

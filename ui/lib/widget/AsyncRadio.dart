@@ -1,140 +1,73 @@
-﻿import 'dart:async';
+﻿import 'package:flutter/material.dart';
 
-import 'package:flutter/material.dart';
+import 'AsyncWidget.dart';
 
-typedef AsyncValueSetter<T> = Future<bool> Function(T value);
-typedef AsyncValueGetter<T> = Future<T> Function();
-typedef ErrorCallback = void Function(Object error, StackTrace? stack);
-
-class AsyncRadio<T> extends StatefulWidget {
+class AsyncRadio<T> extends AsyncWidget<T, AsyncRadio<T>> {
   final T value;
-  final dynamic selected;
-  final T defaultSelected;
-  final AsyncValueSetter<T> onSelected;
-  final Duration timeout;
-  final ErrorCallback? onError;
-
-  final Widget? title;
-  final Widget? subtitle;
 
   const AsyncRadio({
     super.key,
     required this.value,
-    required this.defaultSelected,
-    required this.onSelected,
-    this.selected,
-    this.timeout = const Duration(seconds: 10),
-    this.onError,
-    this.title,
-    this.subtitle,
-  });
+    required T defaultValue,
+    super.getter,
+    super.setter,
+    super.errorHandler,
+    super.timeoutTime,
+    super.showDefaultError,
+    super.progressNotifier,
+    super.readOnlyNotifier,
+  }) : super(defaultValue: defaultValue);
+
+  @override
+  AsyncRadio<T> copyWith({
+    T? defaultValue,
+    AsyncValueGetter<T>? getter,
+    AsyncValueSetter<T>? setter,
+    ErrorCallback? errorHandler,
+    Duration? timeout,
+    bool? showDefaultError,
+    AsyncDrawer<T>? drawer,
+    AsyncItemsGetter<T>? itemsGetter,
+    ValueNotifier<double>? progressNotifier,
+    ValueNotifier<bool>? readOnlyNotifier,
+  }) {
+    return AsyncRadio<T>(
+      key: key,
+      value: value,
+      defaultValue: defaultValue ?? this.defaultValue!,
+      getter: getter ?? this.getter,
+      setter: setter ?? this.setter,
+      errorHandler: errorHandler ?? this.errorHandler,
+      timeoutTime: timeout ?? this.timeoutTime,
+      showDefaultError: showDefaultError ?? this.showDefaultError,
+      progressNotifier: progressNotifier ?? this.progressNotifier,
+      readOnlyNotifier: readOnlyNotifier ?? this.readOnlyNotifier,
+    );
+  }
 
   @override
   State<AsyncRadio<T>> createState() => _AsyncRadioState<T>();
 }
 
-class _AsyncRadioState<T> extends State<AsyncRadio<T>> {
-  late T _groupValue;
-  bool _loading = false;
-  bool _initializing = true;
-
+class _AsyncRadioState<T> extends AsyncWidgetState<T, AsyncRadio<T>> {
   @override
-  void initState() {
-    super.initState();
-    _groupValue = widget.defaultSelected;
-    _initSelected();
-  }
+  Widget buildContent(BuildContext context, T? groupValue, bool busy, double? progress, List<T>? items) {
+    final canInteract = !busy && !readOnly && widget.setter != null;
+    final hasProgress = progress != null && progress != -1;
+    Widget? overlay;
 
-  @override
-  void didUpdateWidget(covariant AsyncRadio<T> oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    if (_loading || _initializing) return;
-
-    if (widget.selected is T && widget.selected != oldWidget.selected) {
-      _groupValue = widget.selected as T;
-    }
-  }
-
-  Future<void> _initSelected() async {
-    final val = widget.selected;
-
-    if (val == null) {
-      _groupValue = widget.defaultSelected;
-      _initializing = false;
-      return;
+    if (hasProgress) {
+      overlay = CircularProgressIndicator(value: progress, strokeWidth: 2);
+    } else if (busy) {
+      overlay = const CircularProgressIndicator(strokeWidth: 2);
     }
 
-    if (val is T) {
-      _groupValue = val;
-      _initializing = false;
-      return;
-    }
-
-    if (val is AsyncValueGetter<T>) {
-      try {
-        _groupValue = await val().timeout(widget.timeout);
-      } on TimeoutException catch (e, s) {
-        _handleError(e, s);
-        _groupValue = widget.defaultSelected;
-      } catch (e, s) {
-        _handleError(e, s);
-        _groupValue = widget.defaultSelected;
-      } finally {
-        if (mounted) setState(() => _initializing = false);
-      }
-      return;
-    }
-
-    throw ArgumentError('selected 必须是 T / AsyncValueGetter<T> / null');
-  }
-
-  Future<void> _handleSelect() async {
-    if (_loading || _initializing) return;
-    if (_groupValue == widget.value) return;
-
-    final oldValue = _groupValue;
-    setState(() => _loading = true);
-
-    try {
-      final ok = await widget.onSelected(widget.value).timeout(widget.timeout);
-      if (!ok) throw StateError('操作被拒绝');
-      if (mounted) setState(() => _groupValue = widget.value);
-    } on TimeoutException catch (e, s) {
-      _handleError(e, s);
-      _groupValue = oldValue;
-    } catch (e, s) {
-      _handleError(e, s);
-      _groupValue = oldValue;
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  void _handleError(Object error, [StackTrace? stack]) {
-    if (widget.onError != null) {
-      widget.onError!(error, stack);
-    } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $error'), duration: const Duration(seconds: 2), showCloseIcon: true),
-        );
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final busy = _loading || _initializing;
-
-    return RadioListTile<T>(
-      title: widget.title,
-      subtitle: widget.subtitle,
-      value: widget.value,
-      groupValue: _groupValue,
-      onChanged: busy ? null : (_) => _handleSelect(),
-      secondary: busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Radio<T>(value: widget.value, groupValue: groupValue, onChanged: canInteract ? (_) => changeValue(widget.value) : null),
+        if (overlay != null) IgnorePointer(child: SizedBox.square(dimension: 24, child: overlay)),
+      ],
     );
   }
 }

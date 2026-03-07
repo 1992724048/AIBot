@@ -1,5 +1,5 @@
 ﻿// 遂沫 screenshot.h
-// 2026-02-22 17:09:09
+// 2026-02-26 22:56:19
 
 #pragma once
 #include <Windows.h>
@@ -24,14 +24,15 @@ namespace module {
         inline static std::atomic_bool isWindow;
         inline static std::atomic<HWND> hwnd;
 
-        [[nodiscard]] static auto get_frame() -> std::pair<cv::Mat&, std::shared_lock<std::shared_mutex>> {
-            return {frame, std::shared_lock(mutex)};
+        [[nodiscard]] static auto get_frame() -> cv::Mat& {
+            return frame;
         }
+
+        inline static std::shared_mutex mutex;
     private:
         static auto fps_limit(std::chrono::time_point<std::chrono::steady_clock> frame_start) -> void;
         static auto capture(cv::Mat& frame_temp, cv::Size size) -> bool;
 
-        inline static std::shared_mutex mutex;
         inline static cv::Mat frame;
         inline static std::jthread jthread;
         inline static std::vector<stdpp::screen::MonitorInfo> monitors;
