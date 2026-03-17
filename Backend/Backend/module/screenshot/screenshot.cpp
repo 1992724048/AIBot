@@ -1,17 +1,16 @@
 // 遂沫 screenshot.cpp
-// 2026-03-07 21:23:57
+// 2026-03-13 17:26:05
 
 #include "screenshot.h"
 #include "page/preveiw/preveiw.h"
 #include "stdpp/encode.h"
 
 #include <chrono>
-
 #include "module/ModelBackend.h"
-
 #include "page/control/control.h"
-
 #include "stdpp/thread.hpp"
+
+#include "module/bluetooth/bluetooth.h"
 
 using namespace std::chrono_literals;
 using namespace module;
@@ -64,12 +63,12 @@ auto Screenshot::start_monitor() -> void {
                 frame = temp.clone();
             }
 
-            auto _ = ins->show_detect.read_lock();
             if (future.valid()) {
                 future.wait();
 
                 auto model_page = ModelPage::instance();
                 auto control_page = ControlPage::instance();
+                auto _ = ins->show_detect.read_lock();
                 if (auto vec = future.get()) {
                     if (ins->show_detect) {
                         for (const auto& [id, box] : vec.value()) {
@@ -77,7 +76,7 @@ auto Screenshot::start_monitor() -> void {
                             std::string label = std::format("ID:{}:{}", id, model_page->get_tag_name(id));
 
                             int baseline = 0;
-                            cv::Size text_size = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseline);
+                            cv::Size text_size = getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseline);
                             cv::Rect bg_rect(box.x, box.y - text_size.height - 5, text_size.width, text_size.height + baseline);
                             rectangle(temp, bg_rect, cv::Scalar(0, 255, 0), cv::FILLED);
                             putText(temp, label, {box.x, box.y - 5}, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 1);
@@ -86,55 +85,77 @@ auto Screenshot::start_monitor() -> void {
 
                     ins->put_image(temp);
 
+                    auto _ = control_page->device.read_lock();
                     cv::Point2i screen_center{target_width / 2, target_height / 2};
                     if ((GetAsyncKeyState(control_page->key.load()) & 0x8000) != 0) {
-                        int lenght{std::numeric_limits<int>::max()};
+                        auto _ = control_page->x.read_lock();
+                        auto _ = control_page->y.read_lock();
+                        int length{std::numeric_limits<int>::max()};
                         cv::Point2i move_point;
                         for (auto& [id, box] : vec.value()) {
                             if (!model_page->is_select(id)) {
                                 continue;
                             }
 
-                            box.width /= 2;
-                            box.height /= 2;
+                            box.width *= *control_page->x / 100;
+                            box.height *= *control_page->y / 100;
 
                             cv::Point2i target_center{box.x + box.width, box.y + box.height};
-
-                            if (int len = norm(screen_center - target_center); len < lenght) {
+                            if (int len = norm(screen_center - target_center); len < length) {
                                 move_point = target_center;
-                                lenght = len;
+                                length = len;
                             }
                         }
 
-                        if (lenght != std::numeric_limits<int>::max()) {
+                        if (length != std::numeric_limits<int>::max()) {
                             auto _ = control_page->speed.read_lock();
                             float speed = *control_page->speed / 100;
                             cv::Point2i offset{move_point - screen_center};
-                            std::array<INPUT, 1> inputs;
-                            inputs[0].type = INPUT_MOUSE;
-                            inputs[0].mi.dwFlags = MOUSEEVENTF_MOVE;
-                            inputs[0].mi.dx = offset.x * speed;
-                            inputs[0].mi.dy = offset.y * speed;
-                            SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
+                            switch (*control_page->device) {
+                                case WindowsAPI: {
+                                    std::array<INPUT, 1> inputs;
+                                    inputs[0].type = INPUT_MOUSE;
+                                    inputs[0].mi.dwFlags = MOUSEEVENTF_MOVE;
+                                    inputs[0].mi.dx = offset.x * speed;
+                                    inputs[0].mi.dy = offset.y * speed;
+                                    SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
+                                    break;
+                                }
+                                case ESP32S3BLE: {
+                                    MouseHID::mouse_move(offset.x * speed, offset.y * speed);
+                                    break;
+                                }
+                                default: ;
+                            }
                         }
                     }
 
                     auto _ = control_page->auto_fire.read_lock();
-                    if (*control_page->auto_fire) {
+                    if (*control_page->auto_fire && (control_page->auto_fire_key == 0 || (GetAsyncKeyState(control_page->auto_fire_key.load()) & 0x8000) != 0)) {
                         for (auto& [id, box] : vec.value()) {
                             if (!model_page->is_select(id)) {
                                 continue;
                             }
 
                             if (screen_center.x >= box.x && screen_center.x <= box.x + box.width && screen_center.y >= box.y && screen_center.y <= box.y + box.height) {
-                                std::array<INPUT, 1> inputs;
-                                inputs[0].type = INPUT_MOUSE;
-                                inputs[0].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
-                                SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
-                                std::this_thread::sleep_for(1ms);
-                                inputs[0].type = INPUT_MOUSE;
-                                inputs[0].mi.dwFlags = MOUSEEVENTF_LEFTUP;
-                                SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
+                                switch (*control_page->device) {
+                                    case WindowsAPI: {
+                                        std::array<INPUT, 1> inputs;
+                                        inputs[0].type = INPUT_MOUSE;
+                                        inputs[0].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+                                        SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
+                                        std::this_thread::sleep_for(1ms);
+                                        inputs[0].type = INPUT_MOUSE;
+                                        inputs[0].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+                                        SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
+                                        break;
+                                    }
+                                    case ESP32S3BLE: {
+                                        MouseHID::mouse_click(MouseButton::BUTTON_LEFT);
+                                        break;
+                                    }
+                                    default: ;
+                                }
                                 break;
                             }
                         }

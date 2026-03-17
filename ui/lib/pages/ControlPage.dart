@@ -71,8 +71,10 @@ class MouseControl extends StatefulWidget {
 
 class _MouseControl extends State<MouseControl> {
   final keys = Int32ListField("ControlPage::keys", Int32List(0));
-  final device = StringField("ControlPage::device", 'Windows API');
+  final autoFireHotKey = Int32ListField("ControlPage::auto_fire_hot_key", Int32List(0));
+  final device = IntField("ControlPage::device", 0);
   final autoFire = BoolField("ControlPage::auto_fire", false);
+  final deviceMode = ['Windows API', 'ESP32S3 HID (BLE)'];
 
   static const icons = {'Windows API': Icon(Icons.desktop_windows), 'ESP32S3 HID (BLE)': Icon(Icons.bluetooth)};
 
@@ -92,7 +94,7 @@ class _MouseControl extends State<MouseControl> {
         children: [
           HotkeyRecordWidget(
                 title: Text("瞄准快捷键"),
-                subtitle: Text("用于启用自动瞄准的快捷键", style: TextStyle(fontSize: 13)),
+            subtitle: Text("用于触发自动瞄准的快捷键", style: TextStyle(fontSize: 13)),
               )
               .get(() async {
                 List<LogicalKeyboardKey> k = [];
@@ -115,6 +117,31 @@ class _MouseControl extends State<MouseControl> {
                 return true;
               }),
           Divider(),
+          HotkeyRecordWidget(
+            title: Text("自动扳机热键"),
+            subtitle: Text("留空表示始终开启", style: TextStyle(fontSize: 13)),
+          )
+              .get(() async {
+            List<LogicalKeyboardKey> k = [];
+            final ks = await autoFireHotKey.get();
+            for (int i = 0; i < ks.length; i++) {
+              final key = ks[i];
+              final mappedKey = vkToLogicalKeyboardKey(key);
+              if (mappedKey != null) {
+                k.add(mappedKey);
+              }
+            }
+            return k;
+          })
+              .set((v) async {
+            var k = Int32List(v.length);
+            for (int i = 0; i < v.length; i++) {
+              k[i] = logicalKeyboardKeyToVk(v[i])!;
+            }
+            await autoFireHotKey.set(k);
+            return true;
+          }),
+          Divider(),
           AsyncSwitch(title: Text('自动扳机'), subtitle: Text('准星在检测框内自动开火')).get(() async => await autoFire.get()).set((v) async => await autoFire.set(v)),
           Divider(),
           AsyncDropdown(
@@ -126,19 +153,19 @@ class _MouseControl extends State<MouseControl> {
                   );
                 },
               )
-              .get(() async => await device.get())
+              .get(() async => deviceMode[await device.get()])
               .set((v) async {
-                await device.set(v);
+            await device.set(deviceMode.indexOf(v));
                 return true;
               })
-              .items(() async => ['Windows API', 'ESP32S3 HID (BLE)']),
+              .items(() async => deviceMode),
           ValueListenableBuilder(
             valueListenable: device,
             builder: (context, value, child) {
-              switch (value) {
-                case 'ESP32S3 HID (BLE)':
+              switch (device.value) {
+                case 1:
                   return Column(children: [Divider(), ESP32S3BLE()]);
-                case 'Windows API':
+                case 0:
                   break;
                 default:
               }
@@ -160,6 +187,8 @@ class MoveAlgorithm extends StatefulWidget {
 
 class _MoveAlgorithmState extends State<MoveAlgorithm> {
   final speed = FloatField("ControlPage::speed", 1);
+  final x_ = FloatField("ControlPage::x", 50);
+  final y_ = FloatField("ControlPage::y", 20);
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +217,36 @@ class _MoveAlgorithmState extends State<MoveAlgorithm> {
             await speed.set(v);
             return true;
           }),
+          Divider(),
+          AsyncInput(label: "X位置百分比", keyboardType: .number, prefixIcon: Icon(Icons.speed)).get(() async =>
+              (await x_.get()).toString()).set((String value) async {
+            final v = double.tryParse(value);
+            if (v == null) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入合法整数')));
+              return false;
+            }
+            if (v > 100 || v < 1) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入[1, 100]的数值区间')));
+              return false;
+            }
+            await x_.set(v);
+            return true;
+          }),
+          SizedBox(height: 5),
+          AsyncInput(label: "Y位置百分比", keyboardType: .number, prefixIcon: Icon(Icons.speed)).get(() async =>
+              (await y_.get()).toString()).set((String value) async {
+            final v = double.tryParse(value);
+            if (v == null) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入合法整数')));
+              return false;
+            }
+            if (v > 100 || v < 1) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入[1, 100]的数值区间')));
+              return false;
+            }
+            await y_.set(v);
+            return true;
+          }),
         ],
       ),
     );
@@ -204,6 +263,86 @@ class ESP32S3BLE extends StatefulWidget {
 class _ESP32S3BLEState extends State<ESP32S3BLE> {
   @override
   Widget build(BuildContext context) {
-    return Column(children: []);
+    return FutureBuilder(
+      future: 'get_ble_device'.cpp.invoke(),
+      builder: (context, snapshot) {
+        Widget leftContent;
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          leftContent = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(height: 16, width: 120, color: Colors.grey.shade300),
+                  const SizedBox(width: 4),
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(color: Colors.grey, shape: BoxShape.circle),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Container(height: 12, width: 160, color: Colors.grey.shade300),
+            ],
+          );
+        } else if (!snapshot.hasData) {
+          leftContent = const Text("未获取到设备");
+        } else {
+          final value = snapshot.data as Map;
+
+          if (value.isEmpty) {
+            leftContent = const Text("无设备");
+          } else {
+            final status = value['status'] as bool;
+            final name = value['name'] as String;
+            final addr = value['addr'] as int;
+
+            final data = status ? formatAddr(addr) : '未连接设备';
+            final title = status ? name : '无设备';
+
+            leftContent = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(title),
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(color: status ? Colors.green : Colors.red, shape: BoxShape.circle),
+                    ),
+                  ],
+                ),
+                Text(data, style: const TextStyle(fontSize: 12)),
+              ],
+            );
+          }
+        }
+
+        return Row(
+          children: [
+            Expanded(child: leftContent),
+            Padding(
+              padding: const EdgeInsets.only(right: 5),
+              child: IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  setState(() {});
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String formatAddr(int addr) {
+    final hex = addr.toRadixString(16).padLeft(12, '0').toUpperCase();
+    return hex.replaceAllMapped(RegExp(r'.{2}'), (m) => '${m.group(0)}:').substring(0, 17);
   }
 }

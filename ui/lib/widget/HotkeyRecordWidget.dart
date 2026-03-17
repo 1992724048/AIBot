@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'AsyncWidget.dart';
@@ -147,6 +148,11 @@ class _HotkeyRecordWidgetState extends AsyncWidgetState<List<LogicalKeyboardKey>
     if (key == LogicalKeyboardKey.meta) return "Meta";
     if (key == LogicalKeyboardKey.metaLeft) return "LMeta";
     if (key == LogicalKeyboardKey.metaRight) return "RMeta";
+    if (key == MouseLogicalKeyboardKey.mouseLeft) return "Mouse Left";
+    if (key == MouseLogicalKeyboardKey.mouseRight) return "Mouse Right";
+    if (key == MouseLogicalKeyboardKey.mouseMiddle) return "Mouse Middle";
+    if (key == MouseLogicalKeyboardKey.mouseBack) return "Mouse Back";
+    if (key == MouseLogicalKeyboardKey.mouseForward) return "Mouse Forward";
 
     return key.keyLabel.isNotEmpty ? key.keyLabel.toUpperCase() : key.debugName ?? "";
   }
@@ -192,6 +198,11 @@ class _HotkeyRecordDialogState extends State<_HotkeyRecordDialog> {
     if (key == LogicalKeyboardKey.meta) return "Meta";
     if (key == LogicalKeyboardKey.metaLeft) return "LMeta";
     if (key == LogicalKeyboardKey.metaRight) return "RMeta";
+    if (key == MouseLogicalKeyboardKey.mouseLeft) return "Mouse Left";
+    if (key == MouseLogicalKeyboardKey.mouseRight) return "Mouse Right";
+    if (key == MouseLogicalKeyboardKey.mouseMiddle) return "Mouse Middle";
+    if (key == MouseLogicalKeyboardKey.mouseBack) return "Mouse Back";
+    if (key == MouseLogicalKeyboardKey.mouseForward) return "Mouse Forward";
 
     return key.keyLabel.isNotEmpty ? key.keyLabel.toUpperCase() : key.debugName ?? "";
   }
@@ -217,7 +228,7 @@ class _HotkeyRecordDialogState extends State<_HotkeyRecordDialog> {
     if (_modifiers.contains(LogicalKeyboardKey.shiftRight)) {
       ordered.add(LogicalKeyboardKey.shiftRight);
     }
-    if (_modifiers.contains(LogicalKeyboardKey.altRight)) {
+    if (_modifiers.contains(LogicalKeyboardKey.alt)) {
       ordered.add(LogicalKeyboardKey.alt);
     }
     if (_modifiers.contains(LogicalKeyboardKey.altRight)) {
@@ -284,6 +295,32 @@ class _HotkeyRecordDialogState extends State<_HotkeyRecordDialog> {
 
   @override
   Widget build(BuildContext context) {
+    void onPointerDown(PointerDownEvent event) {
+      LogicalKeyboardKey? key;
+      switch (event.buttons) {
+        case kPrimaryMouseButton:
+          key = MouseLogicalKeyboardKey.mouseLeft;
+          break;
+        case kSecondaryMouseButton:
+          key = MouseLogicalKeyboardKey.mouseRight;
+          break;
+        case kMiddleMouseButton:
+          key = MouseLogicalKeyboardKey.mouseMiddle;
+          break;
+        case kBackMouseButton:
+          key = MouseLogicalKeyboardKey.mouseBack;
+          break;
+        case kForwardMouseButton:
+          key = MouseLogicalKeyboardKey.mouseForward;
+          break;
+      }
+      if (key != null) {
+        setState(() {
+          _mainKey = key;
+        });
+      }
+    }
+
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 200),
       contentPadding: const EdgeInsets.all(20),
@@ -295,28 +332,28 @@ class _HotkeyRecordDialogState extends State<_HotkeyRecordDialog> {
           onKeyEvent: (node, event) {
             if (event is KeyDownEvent) {
               final key = event.logicalKey;
-
               if (key == LogicalKeyboardKey.escape) {
                 Navigator.of(context).pop(null);
                 return KeyEventResult.handled;
               }
-
               if (_isModifier(key)) {
                 _modifiers.add(key);
               } else {
                 _mainKey = key;
               }
-
               setState(() {});
               return KeyEventResult.handled;
             }
-
             return KeyEventResult.handled;
           },
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(child: Center(child: _buildDisplay())),
+              Expanded(
+                child: Center(
+                  child: Listener(onPointerDown: onPointerDown, child: _buildDisplay()),
+                ),
+              ),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -337,6 +374,14 @@ class _HotkeyRecordDialogState extends State<_HotkeyRecordDialog> {
       ),
     );
   }
+}
+
+class MouseLogicalKeyboardKey {
+  static const LogicalKeyboardKey mouseLeft = LogicalKeyboardKey(0x200000001);
+  static const LogicalKeyboardKey mouseRight = LogicalKeyboardKey(0x200000002);
+  static const LogicalKeyboardKey mouseMiddle = LogicalKeyboardKey(0x200000003);
+  static const LogicalKeyboardKey mouseBack = LogicalKeyboardKey(0x200000004);
+  static const LogicalKeyboardKey mouseForward = LogicalKeyboardKey(0x200000005);
 }
 
 int? logicalKeyboardKeyToVk(LogicalKeyboardKey key) {
@@ -416,6 +461,12 @@ int? logicalKeyboardKeyToVk(LogicalKeyboardKey key) {
     LogicalKeyboardKey.equal: 0xBB, // VK_OEM_PLUS
     LogicalKeyboardKey.slash: 0xBF, // VK_OEM_2
     LogicalKeyboardKey.backquote: 0xC0, // VK_OEM_3
+    // 鼠标
+    MouseLogicalKeyboardKey.mouseLeft: 0x01, // VK_LBUTTON
+    MouseLogicalKeyboardKey.mouseRight: 0x02, // VK_RBUTTON
+    MouseLogicalKeyboardKey.mouseMiddle: 0x04, // VK_MBUTTON
+    MouseLogicalKeyboardKey.mouseForward: 0x05, // VK_XBUTTON1
+    MouseLogicalKeyboardKey.mouseBack: 0x06, // VK_XBUTTON2
   };
 
   if (specialKeyMap.containsKey(key)) {
@@ -510,6 +561,12 @@ LogicalKeyboardKey? vkToLogicalKeyboardKey(int vkCode) {
     0xBB: LogicalKeyboardKey.equal, // VK_OEM_PLUS
     0xBF: LogicalKeyboardKey.slash, // VK_OEM_2
     0xC0: LogicalKeyboardKey.backquote, // VK_OEM_3
+    // 鼠标
+    0x01: MouseLogicalKeyboardKey.mouseLeft, // VK_LBUTTON
+    0x02: MouseLogicalKeyboardKey.mouseRight, // VK_RBUTTON
+    0x04: MouseLogicalKeyboardKey.mouseMiddle, // VK_MBUTTON
+    0x05: MouseLogicalKeyboardKey.mouseForward, // VK_XBUTTON1
+    0x06: MouseLogicalKeyboardKey.mouseBack, // VK_XBUTTON2
   };
 
   if (vkToKeyMap.containsKey(vkCode)) {

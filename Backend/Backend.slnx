@@ -4,6 +4,7 @@
     <Platform Name="x64" />
   </Configurations>
   <Project Path="../../Library/Flutter/Flutter.vcxitems" Id="6a4148a9-cde1-467f-ad8b-74e3974b41ab" />
+  <Project Path="../../Library/glm/glm.vcxitems" Id="bf232a4e-9838-4e2a-a144-bcc9f616d646" />
   <Project Path="../../Library/magic_enum/magic_enum.vcxitems" Id="89bf4412-c3ae-4725-b946-ec5aba6d8ea3" />
   <Project Path="../../Library/mimalloc/mimalloc.vcxitems" Id="85f76382-1274-4617-b01c-b72a8e463c4c" />
   <Project Path="../../Library/OpenCV/OpenCV.vcxitems" Id="ef413479-cbe0-4a14-b733-707eb60cf1f7" />
@@ -11,6 +12,7 @@
   <Project Path="../../Library/parallel_hashmap/parallel_hashmap.vcxitems" Id="fb975bce-5eab-4257-92f9-8a19bf995845" />
   <Project Path="../../Library/stdpp/stdpp.vcxitems" Id="83123dd2-7a7e-496b-9b5d-e426d0ee48e3" />
   <Project Path="../../Library/toml11/toml11.vcxitems" Id="52546c69-9f00-46c5-8706-9d6a152876ee" />
+  <Project Path="../../Library/units/units.vcxitems" Id="59eb474a-c163-40ba-b210-47dfc8bc5bcd" />
   <Project Path="../../Library/v8/v8.vcxitems" Id="b9dfbdc8-82a4-4d3d-956c-ad73ca312121" />
   <Project Path="../../Library/zlib/zlib.vcxitems" Id="a19772eb-042d-4a04-a0d7-ab2fe8094a6f" />
   <Project Path="Backend/Backend.vcxproj" Id="d573f1dd-6d5c-491c-b58e-62bf888c712e" />

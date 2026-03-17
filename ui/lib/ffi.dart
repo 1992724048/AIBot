@@ -145,12 +145,14 @@ abstract class Field<T> extends ChangeNotifier implements ValueListenable<T> {
             (data) {
               if (_disposed) return;
               try {
-                if (data is Map && data.containsKey('value')) {
-                  final newValue = _fromDynamic(data['value']);
-                  if (newValue != null && newValue != _value) {
-                    _value = newValue;
-                    notifyListeners();
+                if (data is Map) {
+                  if (data.containsKey('value')) {
+                    final newValue = _fromDynamic(data['value']);
+                    if (newValue != null && newValue != _value) {
+                      _value = newValue;
+                    }
                   }
+                  notifyListeners();
                 }
               } catch (e) {
                 onError?.call(FFIException('LISTENER_PROCESS_ERROR', 'Field $name process notification error: $e'), StackTrace.current);

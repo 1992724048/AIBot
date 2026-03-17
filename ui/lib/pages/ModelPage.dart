@@ -185,20 +185,20 @@ class _ModelTagState extends State<ModelTag> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: _modelName,
-      builder: (context, value, child) {
-        return CustomCard(
-          title: Baseline(
-            baseline: 14,
-            baselineType: TextBaseline.alphabetic,
-            child: Text('对象标签', style: TextStyle(fontSize: 14, height: 1.0)),
-          ),
-          elevation: 2,
-          icon: Icons.new_label,
-          borderRadius: 5,
-          titleSpacing: 5,
-          child: Column(
+    return CustomCard(
+      title: Baseline(
+        baseline: 14,
+        baselineType: TextBaseline.alphabetic,
+        child: Text('对象标签', style: TextStyle(fontSize: 14, height: 1.0)),
+      ),
+      elevation: 2,
+      icon: Icons.new_label,
+      borderRadius: 5,
+      titleSpacing: 5,
+      child: ValueListenableBuilder(
+        valueListenable: _modelName,
+        builder: (context, value, child) {
+          return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               AlertBlock.note(child: Text("选择需要检测的对象类别，未选择的类别将被忽略。")),
@@ -219,9 +219,9 @@ class _ModelTagState extends State<ModelTag> {
                   ],
                 ),
             ],
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
