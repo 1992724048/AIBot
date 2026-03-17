@@ -64,7 +64,7 @@ auto APIENTRY wWinMain(_In_ const HINSTANCE hInstance, _In_opt_ const HINSTANCE 
     }
 
     // 自己发布改成你的代码签名哈希值
-    // 非本人签名的文件造成的病毒传播与本人无关
+    // 非本人签名的文件造成的病毒传播、资料窃取等行为与本人无关，本人不对此承担任何责任
     if (!js.compile(
             R"(var str2 = "70cfbdc8f3b06f53663dfd8b17fb7218564c448032fe348da7abc2ab41e2dca06670cc2ef103d33a369e6d3dfa86f5884f3e3a36775d03a1a487822d33c75eb1";function check(str1){if(str1==str2){return run(str2);}return 114514;})"_xs)) {
         throw std::runtime_error("[v8Engine] JavaScript编译失败!"_xs);
