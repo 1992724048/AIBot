@@ -33,45 +33,12 @@ extension CppStringLiteral on String {
   Dart get cpp => Dart(this);
 }
 
-class FFIEventBus {
-  static final FFIEventBus _instance = FFIEventBus._internal();
-
-  factory FFIEventBus() => _instance;
-
-  FFIEventBus._internal();
-
-  final _controllers = <String, StreamController<dynamic>>{};
-  final _subscriptions = <String, List<StreamSubscription>>{};
-
-  Stream<dynamic> on(String event) {
-    if (!_controllers.containsKey(event)) {
-      _controllers[event] = StreamController<dynamic>.broadcast();
-    }
-    return _controllers[event]!.stream;
-  }
-
-  void emit(String event, dynamic data) {
-    if (_controllers.containsKey(event)) {
-      _controllers[event]!.add(data);
-    }
-  }
-
-  void dispose() {
-    for (final controller in _controllers.values) {
-      controller.close();
-    }
-    _controllers.clear();
-    _subscriptions.clear();
-  }
-}
-
 abstract final class FFI {
   FFI._();
 
   static const MethodChannel _channel = MethodChannel('ffi_cpp');
   static bool isSetMethodCallHandler = false;
   static final Map<String, Future<dynamic> Function(Map?)> _methodHandler = {};
-  static final eventBus = FFIEventBus();
 
   static void _ensureInitialized() {
     if (!isSetMethodCallHandler) {
@@ -100,11 +67,6 @@ abstract final class FFI {
   static void unregisterMethod(String method) => _methodHandler.remove(method);
 
   static Future<dynamic> _onPlatformCall(MethodCall call) async {
-    if (call.method.startsWith('notifier_')) {
-      eventBus.emit(call.method, call.arguments);
-      return null;
-    }
-
     if (!_methodHandler.containsKey(call.method)) {
       throw MissingPluginException('FFI: method "${call.method}" not registered on Dart side');
     }
@@ -130,7 +92,6 @@ abstract class Field<T> extends ChangeNotifier implements ValueListenable<T> {
   final String name;
   T _value;
   bool _disposed = false;
-  late final StreamSubscription _subscription;
   void Function(Object error, StackTrace stack)? onError;
 
   Field._internal(this.name, this._value, {this.onError}) {
@@ -139,29 +100,25 @@ abstract class Field<T> extends ChangeNotifier implements ValueListenable<T> {
 
   void _setupListener() {
     try {
-      _subscription = FFI.eventBus
-          .on('notifier_$name')
-          .listen(
-            (data) {
-              if (_disposed) return;
-              try {
-                if (data is Map) {
-                  if (data.containsKey('value')) {
-                    final newValue = _fromDynamic(data['value']);
-                    if (newValue != null && newValue != _value) {
-                      _value = newValue;
-                    }
-                  }
-                  notifyListeners();
-                }
-              } catch (e) {
-                onError?.call(FFIException('LISTENER_PROCESS_ERROR', 'Field $name process notification error: $e'), StackTrace.current);
+      'notifier_$name'.cpp.method((data) async {
+        if (_disposed) return null;
+        try {
+          if (data is Map) {
+            if (data.containsKey('value')) {
+              final newValue = _fromDynamic(data['value']);
+              if (newValue != null) {
+                _value = newValue;
               }
-            },
-            onError: (error) {
-              onError?.call(FFIException('LISTENER_ERROR', 'Field $name listener error: $error'), StackTrace.current);
-            },
-          );
+            }
+            Future.microtask(() {
+              if (!_disposed) notifyListeners();
+            });
+          }
+        } catch (e) {
+          onError?.call(FFIException('LISTENER_PROCESS_ERROR', 'Field $name process notification error: $e'), StackTrace.current);
+        }
+        return null;
+      });
     } catch (e) {
       onError?.call(FFIException('LISTENER_SETUP_ERROR', 'Field $name setup listener error: $e'), StackTrace.current);
     }
@@ -232,7 +189,6 @@ abstract class Field<T> extends ChangeNotifier implements ValueListenable<T> {
   @override
   void dispose() {
     _disposed = true;
-    _subscription.cancel();
     super.dispose();
   }
 

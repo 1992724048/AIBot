@@ -1,4 +1,4 @@
-﻿// 遂沫 screenshot.h
+// 遂沫 screenshot.h
 // 2026-02-26 22:56:19
 
 #pragma once
@@ -28,6 +28,7 @@ namespace module {
             return frame;
         }
 
+        std::optional<std::vector<std::pair<int, cv::Rect>>> rects;
         inline static std::shared_mutex mutex;
     private:
         static auto fps_limit(std::chrono::time_point<std::chrono::steady_clock> frame_start) -> void;

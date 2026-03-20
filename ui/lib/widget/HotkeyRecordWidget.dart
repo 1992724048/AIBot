@@ -4,9 +4,12 @@ import 'package:flutter/services.dart';
 
 import 'AsyncWidget.dart';
 
+enum HotKeyMode { RegisterHotKey, GetAsyncKeyState }
+
 class HotkeyRecordWidget extends AsyncWidget<List<LogicalKeyboardKey>, HotkeyRecordWidget> {
   final Widget title;
   final Widget? subtitle;
+  final HotKeyMode mode;
 
   const HotkeyRecordWidget({
     super.key,
@@ -22,6 +25,7 @@ class HotkeyRecordWidget extends AsyncWidget<List<LogicalKeyboardKey>, HotkeyRec
     super.readOnlyNotifier,
     required this.title,
     this.subtitle,
+    this.mode = HotKeyMode.RegisterHotKey,
   });
 
   @override
@@ -59,20 +63,16 @@ class HotkeyRecordWidget extends AsyncWidget<List<LogicalKeyboardKey>, HotkeyRec
 
 class _HotkeyRecordWidgetState extends AsyncWidgetState<List<LogicalKeyboardKey>, HotkeyRecordWidget> {
   @override
-  Widget buildContent(BuildContext context, List<LogicalKeyboardKey>? value, bool busy, double? progress, List<List<LogicalKeyboardKey>>? items) {
+  Widget buildContent(
+    BuildContext context,
+    List<LogicalKeyboardKey>? value,
+    bool busy,
+    double? progress,
+    List<List<LogicalKeyboardKey>>? items,
+  ) {
     final isEmpty = value == null || value.isEmpty;
     final canInteract = !busy && !readOnly;
     final hasProgress = progress != null && progress != -1;
-
-    Widget progressBar;
-
-    if (hasProgress) {
-      progressBar = LinearProgressIndicator(value: progress, minHeight: 2);
-    } else if (busy) {
-      progressBar = const LinearProgressIndicator(minHeight: 2);
-    } else {
-      progressBar = const SizedBox(height: 2);
-    }
 
     return Material(
       color: Colors.transparent,
@@ -89,23 +89,44 @@ class _HotkeyRecordWidgetState extends AsyncWidgetState<List<LogicalKeyboardKey>
               child: Row(
                 children: [
                   Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [widget.title, if (widget.subtitle != null) widget.subtitle!]),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [widget.title, if (widget.subtitle != null) widget.subtitle!],
+                    ),
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (isEmpty)
-                        Text("未设置", style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant))
+                        Text(
+                          "未设置",
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        )
                       else
                         Wrap(children: value.map((k) => _buildKeyBlock(_keyToString(k))).toList()),
                       const SizedBox(width: 8),
-                      IconButton(icon: const Icon(Icons.edit), onPressed: canInteract ? _openRecorder : null),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+                        child: (busy || hasProgress)
+                            ? SizedBox(
+                                key: const ValueKey("progress"),
+                                width: 40,
+                                child: LinearProgressIndicator(value: hasProgress ? progress : null, minHeight: 2),
+                              )
+                            : IconButton(
+                                key: const ValueKey("edit"),
+                                icon: const Icon(Icons.edit),
+                                onPressed: canInteract ? _openRecorder : null,
+                              ),
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
-            AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: progressBar),
           ],
         ),
       ),
@@ -113,7 +134,10 @@ class _HotkeyRecordWidgetState extends AsyncWidgetState<List<LogicalKeyboardKey>
   }
 
   Future<void> _openRecorder() async {
-    final result = await showDialog<List<LogicalKeyboardKey>>(context: context, builder: (_) => const _HotkeyRecordDialog());
+    final result = await showDialog<List<LogicalKeyboardKey>>(
+      context: context,
+      builder: (_) => _HotkeyRecordDialog(mode: widget.mode),
+    );
     if (result != null) {
       await changeValue(result);
     }
@@ -159,7 +183,9 @@ class _HotkeyRecordWidgetState extends AsyncWidgetState<List<LogicalKeyboardKey>
 }
 
 class _HotkeyRecordDialog extends StatefulWidget {
-  const _HotkeyRecordDialog();
+  final HotKeyMode mode;
+
+  const _HotkeyRecordDialog({required this.mode});
 
   @override
   State<_HotkeyRecordDialog> createState() => _HotkeyRecordDialogState();
@@ -280,7 +306,7 @@ class _HotkeyRecordDialogState extends State<_HotkeyRecordDialog> {
     final keys = _orderedKeys();
 
     if (keys.isEmpty) {
-      return const Text("按下组合键", style: TextStyle(color: Colors.grey));
+      return Text("按下组合键${ widget.mode == .RegisterHotKey ? '' : ' (支持鼠标)' }", style: TextStyle(color: Colors.grey));
     }
 
     return Wrap(alignment: WrapAlignment.center, children: keys.map((k) => _buildKeyBlock(_keyToString(k))).toList());
@@ -351,7 +377,9 @@ class _HotkeyRecordDialogState extends State<_HotkeyRecordDialog> {
             children: [
               Expanded(
                 child: Center(
-                  child: Listener(onPointerDown: onPointerDown, child: _buildDisplay()),
+                  child: widget.mode == HotKeyMode.GetAsyncKeyState
+                      ? Listener(onPointerDown: onPointerDown, child: _buildDisplay())
+                      : _buildDisplay(),
                 ),
               ),
               const SizedBox(height: 10),
@@ -465,8 +493,8 @@ int? logicalKeyboardKeyToVk(LogicalKeyboardKey key) {
     MouseLogicalKeyboardKey.mouseLeft: 0x01, // VK_LBUTTON
     MouseLogicalKeyboardKey.mouseRight: 0x02, // VK_RBUTTON
     MouseLogicalKeyboardKey.mouseMiddle: 0x04, // VK_MBUTTON
-    MouseLogicalKeyboardKey.mouseForward: 0x05, // VK_XBUTTON1
-    MouseLogicalKeyboardKey.mouseBack: 0x06, // VK_XBUTTON2
+    MouseLogicalKeyboardKey.mouseBack: 0x05, // VK_XBUTTON1
+    MouseLogicalKeyboardKey.mouseForward: 0x06, // VK_XBUTTON2
   };
 
   if (specialKeyMap.containsKey(key)) {
@@ -565,8 +593,8 @@ LogicalKeyboardKey? vkToLogicalKeyboardKey(int vkCode) {
     0x01: MouseLogicalKeyboardKey.mouseLeft, // VK_LBUTTON
     0x02: MouseLogicalKeyboardKey.mouseRight, // VK_RBUTTON
     0x04: MouseLogicalKeyboardKey.mouseMiddle, // VK_MBUTTON
-    0x05: MouseLogicalKeyboardKey.mouseForward, // VK_XBUTTON1
-    0x06: MouseLogicalKeyboardKey.mouseBack, // VK_XBUTTON2
+    0x05: MouseLogicalKeyboardKey.mouseBack, // VK_XBUTTON1
+    0x06: MouseLogicalKeyboardKey.mouseForward, // VK_XBUTTON2
   };
 
   if (vkToKeyMap.containsKey(vkCode)) {

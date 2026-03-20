@@ -1,5 +1,5 @@
-﻿// 遂沫 openvino.cpp
-// 2026-02-28 23:50:55
+// 遂沫 openvino.cpp
+// 2026-03-21 00:11:47
 
 #include "openvino.h"
 
@@ -12,13 +12,15 @@
 
 using namespace module;
 
-constexpr auto operator""_hash(const char* str, const size_t len) -> size_t {
-    size_t hash = 5381;
-    for (size_t i = 0; i < len; ++i) {
-        hash = (hash << 5) + hash + str[i];
+namespace {
+    constexpr auto operator""_hash(const char* str, const size_t len) -> size_t {
+        size_t hash = 5381;
+        for (size_t i = 0; i < len; ++i) {
+            hash = (hash << 5) + hash + str[i];
+        }
+        return hash;
     }
-    return hash;
-}
+} // namespace
 
 OpenVINOImpl::OpenVINOImpl() {
     BackendRegistry::touch();
@@ -26,8 +28,7 @@ OpenVINOImpl::OpenVINOImpl() {
 
 auto OpenVINOImpl::load(const std::filesystem::path& path) -> bool {
     model = core.read_model(path);
-    const auto ptr = model.load();
-    if (!ptr) {
+    if (const auto ptr = model.load(); !ptr) {
         return false;
     }
 

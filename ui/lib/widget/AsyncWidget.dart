@@ -3,7 +3,15 @@
 typedef AsyncValueGetter<T> = Future<T> Function();
 typedef AsyncValueSetter<T> = Future<bool> Function(T value);
 typedef AsyncItemsGetter<T> = Future<List<T>> Function();
-typedef AsyncDrawer<T> = Widget Function(Future<void> Function(T newValue) change, BuildContext context, T? value, bool busy, double? progress, List<T>? items);
+typedef AsyncDrawer<T> =
+    Widget Function(
+      Future<void> Function(T newValue) change,
+      BuildContext context,
+      T? value,
+      bool busy,
+      double? progress,
+      List<T>? items,
+    );
 typedef ErrorCallback = void Function(Object error, StackTrace? stack);
 
 abstract class AsyncWidget<T, W extends AsyncWidget<T, W>> extends StatefulWidget {
@@ -58,7 +66,7 @@ abstract class AsyncWidget<T, W extends AsyncWidget<T, W>> extends StatefulWidge
   W readOnly(ValueNotifier<bool> notifier) => copyWith(readOnlyNotifier: notifier);
 
   W items(AsyncItemsGetter<T> getter) => copyWith(itemsGetter: getter);
-  
+
   W timeout(Duration timeout) => copyWith(timeout: timeout);
 
   W withDefault(T value) => copyWith(defaultValue: value);
@@ -143,7 +151,9 @@ abstract class AsyncWidgetState<T, W extends AsyncWidget<T, W>> extends State<W>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("操作失败: $error"), duration: const Duration(seconds: 2), showCloseIcon: true));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("操作失败: $error"), duration: const Duration(seconds: 2), showCloseIcon: true),
+      );
     });
   }
 
@@ -187,6 +197,16 @@ abstract class AsyncWidgetState<T, W extends AsyncWidget<T, W>> extends State<W>
 
     return child;
   }
+
+  @override
+  void didUpdateWidget(covariant W oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.defaultValue != oldWidget.defaultValue && !initializing) {
+      setState(() {
+        value = widget.defaultValue;
+      });
+    }
+  }
 }
 
 abstract class AsyncActionWidget<W extends AsyncActionWidget<W>> extends StatefulWidget {
@@ -196,9 +216,22 @@ abstract class AsyncActionWidget<W extends AsyncActionWidget<W>> extends Statefu
   final ValueNotifier<double>? progressNotifier;
   final ValueNotifier<bool>? readOnlyNotifier;
 
-  const AsyncActionWidget({super.key, this.action_, this.errorHandler, this.timeout = const Duration(seconds: 10), this.progressNotifier, this.readOnlyNotifier});
+  const AsyncActionWidget({
+    super.key,
+    this.action_,
+    this.errorHandler,
+    this.timeout = const Duration(seconds: 10),
+    this.progressNotifier,
+    this.readOnlyNotifier,
+  });
 
-  W copyWith({Future<bool> Function()? action_, ErrorCallback? errorHandler, Duration? timeout, ValueNotifier<double>? progressNotifier, ValueNotifier<bool>? readOnlyNotifier});
+  W copyWith({
+    Future<bool> Function()? action_,
+    ErrorCallback? errorHandler,
+    Duration? timeout,
+    ValueNotifier<double>? progressNotifier,
+    ValueNotifier<bool>? readOnlyNotifier,
+  });
 
   W action(Future<bool> Function() fn) => copyWith(action_: fn);
 
@@ -247,7 +280,9 @@ abstract class AsyncActionWidgetState<W extends AsyncActionWidget<W>> extends St
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("操作失败: $error"), duration: const Duration(seconds: 2), showCloseIcon: true));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("操作失败: $error"), duration: const Duration(seconds: 2), showCloseIcon: true),
+      );
     });
   }
 

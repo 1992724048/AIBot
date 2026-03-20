@@ -1,5 +1,5 @@
 // 遂沫 main.cpp
-// 2026-03-11 01:37:36
+// 2026-03-21 02:09:38
 
 #pragma comment(lib, "ntdll.lib")
 // ReSharper disable CppUnusedIncludeDirective
@@ -38,6 +38,7 @@
 #include "stdpp/file.h"
 #include "stdpp/v8/js.h"
 #include "stdpp/xorstr.h"
+#include "stdpp/HotKey.h"
 
 // 70cfbdc8f3b06f53663dfd8b17fb7218564c448032fe348da7abc2ab41e2dca06670cc2ef103d33a369e6d3dfa86f5884f3e3a36775d03a1a487822d33c75eb1
 
@@ -56,9 +57,7 @@ auto APIENTRY wWinMain(_In_ const HINSTANCE hInstance, _In_opt_ const HINSTANCE 
     auto& js = JavaScript::current();
 
     #ifndef _DEBUG
-    const auto local_file = file::app_path() / file::app_name();
-    const auto fingerprint = file::get_file_signature_fingerprint<64>(local_file, CALG_SHA_512);
-    if (!fingerprint.has_value()) {
+    const auto local_file = file::app_path() / file::app_name(); const auto fingerprint = file::get_file_signature_fingerprint<64>(local_file, CALG_SHA_512); if (!fingerprint.has_value()) {
         show_cert_msg(fingerprint.error());
         return fingerprint.error();
     }
@@ -68,9 +67,7 @@ auto APIENTRY wWinMain(_In_ const HINSTANCE hInstance, _In_opt_ const HINSTANCE 
     if (!js.compile(
             R"(var str2 = "70cfbdc8f3b06f53663dfd8b17fb7218564c448032fe348da7abc2ab41e2dca06670cc2ef103d33a369e6d3dfa86f5884f3e3a36775d03a1a487822d33c75eb1";function check(str1){if(str1==str2){return run(str2);}return 114514;})"_xs)) {
         throw std::runtime_error("[v8Engine] JavaScript编译失败!"_xs);
-    }
-    js.bind("run"_xs, run);
-    if (js.invoke<int>("check"_xs, util::bytes_to_hex_string(fingerprint.value())) == 114514) {
+    } js.bind("run"_xs, run); if (js.invoke<int>("check"_xs, util::bytes_to_hex_string(fingerprint.value())) == 114514) {
         CMSG(CLOG) << "[Verify] 校验未通过"_xs;
     }
     #else
@@ -139,6 +136,7 @@ auto run(const std::string& info) -> int try {
     }
 
     singleton::SingletonController::init_call();
+    hotkey::HotKey::init();
     if (!config::Config::load(file::app_path() / "cfg.toml"_xs)) {
         WLOG << "[Config] 加载配置文件失败!如果是第一次启动请忽略. 路径: "_xs << config::Config::config_path();
     }
@@ -154,7 +152,6 @@ auto run(const std::string& info) -> int try {
 
     window.show(true);
     window.set_quit_on_close(true);
-
     window.msg_while([](const MSG& msg) {
         switch (msg.message) {
             case WM_QUIT: {
@@ -171,6 +168,7 @@ auto run(const std::string& info) -> int try {
         return false;
     });
 
+    hotkey::HotKey::shutdown();
     CoUninitialize();
     if (!config::Config::save()) {
         EMSG(ELOG) << "[Config] 保存配置文件失败! 路径: "_xs << config::Config::config_path();

@@ -94,7 +94,8 @@ class _MouseControl extends State<MouseControl> {
         children: [
           HotkeyRecordWidget(
                 title: Text("瞄准快捷键"),
-            subtitle: Text("用于触发自动瞄准的快捷键", style: TextStyle(fontSize: 13)),
+                subtitle: Text("用于触发自动瞄准的快捷键", style: TextStyle(fontSize: 13)),
+                mode: .GetAsyncKeyState,
               )
               .get(() async {
                 List<LogicalKeyboardKey> k = [];
@@ -118,44 +119,55 @@ class _MouseControl extends State<MouseControl> {
               }),
           Divider(),
           HotkeyRecordWidget(
-            title: Text("自动扳机热键"),
-            subtitle: Text("留空表示始终开启", style: TextStyle(fontSize: 13)),
-          )
+                title: Text("自动扳机开关热键"),
+                subtitle: Text("用于控制自动扳机是否启用", style: TextStyle(fontSize: 13)),
+              )
               .get(() async {
-            List<LogicalKeyboardKey> k = [];
-            final ks = await autoFireHotKey.get();
-            for (int i = 0; i < ks.length; i++) {
-              final key = ks[i];
-              final mappedKey = vkToLogicalKeyboardKey(key);
-              if (mappedKey != null) {
-                k.add(mappedKey);
-              }
-            }
-            return k;
-          })
+                List<LogicalKeyboardKey> k = [];
+                final ks = await autoFireHotKey.get();
+                for (int i = 0; i < ks.length; i++) {
+                  final key = ks[i];
+                  final mappedKey = vkToLogicalKeyboardKey(key);
+                  if (mappedKey != null) {
+                    k.add(mappedKey);
+                  }
+                }
+                return k;
+              })
               .set((v) async {
-            var k = Int32List(v.length);
-            for (int i = 0; i < v.length; i++) {
-              k[i] = logicalKeyboardKeyToVk(v[i])!;
-            }
-            await autoFireHotKey.set(k);
-            return true;
-          }),
+                var k = Int32List(v.length);
+                for (int i = 0; i < v.length; i++) {
+                  k[i] = logicalKeyboardKeyToVk(v[i])!;
+                }
+                await autoFireHotKey.set(k);
+                return true;
+              }),
           Divider(),
-          AsyncSwitch(title: Text('自动扳机'), subtitle: Text('准星在检测框内自动开火')).get(() async => await autoFire.get()).set((v) async => await autoFire.set(v)),
+          ValueListenableBuilder(
+            valueListenable: autoFire,
+            builder: (context, value, child) => AsyncSwitch(
+              defaultValue: value,
+              title: Text('自动扳机'),
+              subtitle: Text('准星在检测框内自动开火'),
+            ).get(() async => value).set((v) async => await autoFire.set(v)),
+          ),
           Divider(),
           AsyncDropdown(
                 label: "接口类型",
                 itemBeginBuilder: (String item) {
                   return Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: [icons[item] ?? const Icon(Icons.question_mark), const SizedBox(width: 3), const VerticalDivider(thickness: 2, indent: 8, endIndent: 8)],
+                    children: [
+                      icons[item] ?? const Icon(Icons.question_mark),
+                      const SizedBox(width: 3),
+                      const VerticalDivider(thickness: 2, indent: 8, endIndent: 8),
+                    ],
                   );
                 },
               )
               .get(() async => deviceMode[await device.get()])
               .set((v) async {
-            await device.set(deviceMode.indexOf(v));
+                await device.set(deviceMode.indexOf(v));
                 return true;
               })
               .items(() async => deviceMode),
@@ -204,7 +216,11 @@ class _MoveAlgorithmState extends State<MoveAlgorithm> {
       titleSpacing: 5,
       child: Column(
         children: [
-          AsyncInput(label: "移动速度", keyboardType: .number, prefixIcon: Icon(Icons.speed)).get(() async => (await speed.get()).toString()).set((String value) async {
+          AsyncInput(
+            label: "移动速度",
+            keyboardType: .number,
+            prefixIcon: Icon(Icons.speed),
+          ).get(() async => (await speed.get()).toString()).set((String value) async {
             final v = double.tryParse(value);
             if (v == null) {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入合法整数')));
@@ -218,8 +234,11 @@ class _MoveAlgorithmState extends State<MoveAlgorithm> {
             return true;
           }),
           Divider(),
-          AsyncInput(label: "X位置百分比", keyboardType: .number, prefixIcon: Icon(Icons.speed)).get(() async =>
-              (await x_.get()).toString()).set((String value) async {
+          AsyncInput(
+            label: "X位置百分比",
+            keyboardType: .number,
+            prefixIcon: Icon(Icons.speed),
+          ).get(() async => (await x_.get()).toString()).set((String value) async {
             final v = double.tryParse(value);
             if (v == null) {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入合法整数')));
@@ -233,8 +252,11 @@ class _MoveAlgorithmState extends State<MoveAlgorithm> {
             return true;
           }),
           SizedBox(height: 5),
-          AsyncInput(label: "Y位置百分比", keyboardType: .number, prefixIcon: Icon(Icons.speed)).get(() async =>
-              (await y_.get()).toString()).set((String value) async {
+          AsyncInput(
+            label: "Y位置百分比",
+            keyboardType: .number,
+            prefixIcon: Icon(Icons.speed),
+          ).get(() async => (await y_.get()).toString()).set((String value) async {
             final v = double.tryParse(value);
             if (v == null) {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入合法整数')));

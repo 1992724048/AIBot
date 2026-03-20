@@ -92,7 +92,13 @@ class _AsyncSwitchState extends AsyncWidgetState<bool, AsyncSwitch> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [if (widget.title != null) widget.title!, if (widget.subtitle != null) widget.subtitle!]),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (widget.title != null) widget.title!,
+                        if (widget.subtitle != null) widget.subtitle!,
+                      ],
+                    ),
                   ),
                   Switch(value: selected, onChanged: canInteract ? changeValue : null),
                 ],

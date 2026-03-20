@@ -1,5 +1,5 @@
 // 遂沫 screenshot.cpp
-// 2026-03-13 17:26:05
+// 2026-03-21 01:23:54
 
 #include "screenshot.h"
 #include "page/preveiw/preveiw.h"
@@ -131,7 +131,7 @@ auto Screenshot::start_monitor() -> void {
                     }
 
                     auto _ = control_page->auto_fire.read_lock();
-                    if (*control_page->auto_fire && (control_page->auto_fire_key == 0 || (GetAsyncKeyState(control_page->auto_fire_key.load()) & 0x8000) != 0)) {
+                    if (*control_page->auto_fire) {
                         for (auto& [id, box] : vec.value()) {
                             if (!model_page->is_select(id)) {
                                 continue;

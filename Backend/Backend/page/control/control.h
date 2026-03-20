@@ -20,6 +20,9 @@ namespace page {
 
         std::atomic_int key;
         std::atomic_int auto_fire_key;
+        std::atomic_int key_id;
+
+        std::function<void(std::optional<bool>)> toggle_auto_fire;
 
         Field<std::vector<int32_t>> keys{"ControlPage::keys", {VK_LSHIFT}};
         Field<std::vector<int32_t>> auto_fire_hot_key{"ControlPage::auto_fire_hot_key", {VK_XBUTTON1}};
